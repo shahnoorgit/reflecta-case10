@@ -249,55 +249,46 @@ export const VoiceMode: React.FC<VoiceModeProps> = ({ visible, onClose }) => {
         // Use sendMessage which handles everything: saving, streaming, and cloud sync
         await sendMessage(transcribedText);
         
-        // Wait a moment for the message to be fully saved and streamed
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // Wait for streaming to complete - poll until we get a non-streaming assistant message
+        let assistantMessage = null;
+        let attempts = 0;
+        const maxAttempts = 30; // 15 seconds max wait (30 * 500ms)
         
-        // Get the AI response from the latest message in the conversation
-        const conversation = getActiveConversation();
-        const assistantMessage = conversation?.messages
-          .slice()
-          .reverse()
-          .find(m => m.role === 'assistant' && !m.isStreaming);
+        while (!assistantMessage && attempts < maxAttempts) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
+          const conversation = getActiveConversation();
+          assistantMessage = conversation?.messages
+            .slice()
+            .reverse()
+            .find(m => m.role === 'assistant' && !m.isStreaming && m.content.trim().length > 0);
+          
+          attempts++;
+        }
         
         if (assistantMessage) {
           setResponse(assistantMessage.content);
           setIsProcessing(false);
-          setIsSpeaking(true);
 
           // Speak the response
           if (settings.elevenLabsApiKey) {
+            setIsSpeaking(true);
             try {
+              console.log('Starting TTS for:', assistantMessage.content.slice(0, 50) + '...');
               await speakMessage(assistantMessage.content);
-            } catch (err) {
-              console.log('TTS error:', err);
-            }
-          }
-
-          setIsSpeaking(false);
-        } else {
-          // If no response yet, wait a bit more
-          setTimeout(() => {
-            const updatedConversation = getActiveConversation();
-            const updatedAssistantMessage = updatedConversation?.messages
-              .slice()
-              .reverse()
-              .find(m => m.role === 'assistant' && !m.isStreaming);
-            
-            if (updatedAssistantMessage) {
-              setResponse(updatedAssistantMessage.content);
-              setIsProcessing(false);
-              setIsSpeaking(true);
-              
-              if (settings.elevenLabsApiKey) {
-                speakMessage(updatedAssistantMessage.content).catch(console.log);
-              }
-              
+              console.log('TTS completed');
+            } catch (err: any) {
+              console.error('TTS error:', err);
+              setError(`Voice playback failed: ${err.message || 'Unknown error'}`);
+            } finally {
               setIsSpeaking(false);
-            } else {
-              setError('No response received');
-              setIsProcessing(false);
             }
-          }, 2000);
+          } else {
+            console.log('ElevenLabs API key not configured - skipping TTS');
+          }
+        } else {
+          setError('No response received from AI');
+          setIsProcessing(false);
         }
       } catch (err: any) {
         console.error('Failed to send voice message:', err);

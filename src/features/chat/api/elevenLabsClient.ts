@@ -4,6 +4,7 @@
  */
 
 import { Audio } from 'expo-av';
+import * as FileSystem from 'expo-file-system/legacy';
 import { ElevenLabsTTSRequest } from '../types';
 
 const ELEVENLABS_BASE_URL = 'https://api.elevenlabs.io/v1';
@@ -65,12 +66,19 @@ export class ElevenLabsClient {
         throw new Error(`ElevenLabs API error: ${response.status} - ${error}`);
       }
 
-      // Convert response to base64
+      // Save audio to file instead of using data URI (more reliable)
       const arrayBuffer = await response.arrayBuffer();
       const base64 = this.arrayBufferToBase64(arrayBuffer);
-      const uri = `data:audio/mpeg;base64,${base64}`;
+      
+      // Save to cache directory
+      const fileUri = `${FileSystem.cacheDirectory}tts_${Date.now()}.mp3`;
+      await FileSystem.writeAsStringAsync(fileUri, base64, {
+        encoding: 'base64',
+      });
 
-      // Configure audio session
+      console.log('Audio saved to:', fileUri);
+
+      // Configure audio session for playback
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: false,
         playsInSilentModeIOS: true,
@@ -80,17 +88,29 @@ export class ElevenLabsClient {
 
       // Create and play the sound
       const { sound } = await Audio.Sound.createAsync(
-        { uri },
-        { shouldPlay: true },
+        { uri: fileUri },
+        { 
+          shouldPlay: true,
+          volume: 1.0,
+          isMuted: false,
+        },
         (status) => {
-          if (status.isLoaded && status.didJustFinish) {
-            onEnd?.();
+          if (status.isLoaded) {
+            if (status.didJustFinish) {
+              console.log('Audio playback finished');
+              onEnd?.();
+              // Clean up file after playback
+              FileSystem.deleteAsync(fileUri, { idempotent: true }).catch(() => {});
+            }
+          } else if ('error' in status) {
+            console.error('Audio playback error:', status.error);
           }
         }
       );
 
       this.sound = sound;
       onStart?.();
+      console.log('Audio playback started');
     } catch (error) {
       console.error('ElevenLabs TTS error:', error);
       throw error;

@@ -91,9 +91,13 @@ interface ChatState {
 }
 
 const DEFAULT_SETTINGS: ChatSettings = {
+  openRouterApiKey: '',
+  openAiApiKey: '',
+  elevenLabsApiKey: '',
   selectedModel: AVAILABLE_MODELS[1].id, // GPT-4o Mini
   temperature: 0.7,
   maxTokens: 4096,
+  voiceEnabled: true,
   selectedVoice: DEFAULT_VOICES[0].voice_id,
   hapticFeedback: true,
 };
@@ -595,11 +599,25 @@ export const useChatStore = create<ChatState>()(
       speakMessage: async (text: string) => {
         const { elevenLabsClient, settings, setVoiceState } = get();
         
-        if (!elevenLabsClient) {
-          throw new Error('ElevenLabs API key not configured');
+        // Check if API key exists in settings
+        if (!settings.elevenLabsApiKey) {
+          throw new Error('ElevenLabs API key not configured. Please add it in Settings.');
         }
 
-        await elevenLabsClient.speak(
+        // Create client if it doesn't exist but key is present
+        let client = elevenLabsClient;
+        if (!client && settings.elevenLabsApiKey) {
+          console.log('Creating ElevenLabs client from settings...');
+          client = createElevenLabsClient(settings.elevenLabsApiKey);
+          // Update the store with the new client
+          set({ elevenLabsClient: client });
+        }
+
+        if (!client) {
+          throw new Error('Failed to initialize ElevenLabs client');
+        }
+
+        await client.speak(
           text,
           settings.selectedVoice,
           () => setVoiceState({ isSpeaking: true }),
