@@ -53,6 +53,9 @@ interface ChatState {
   openRouterClient: OpenRouterClient | null;
   elevenLabsClient: ElevenLabsClient | null;
   
+  // Active request cleanup functions
+  activeRequestCleanup: (() => void) | null;
+  
   // Actions - User
   setUserId: (userId: string | null) => void;
   
@@ -125,6 +128,7 @@ export const useChatStore = create<ChatState>()(
       error: null,
       openRouterClient: null,
       elevenLabsClient: null,
+      activeRequestCleanup: null,
 
       // Set user ID (called when user logs in)
       setUserId: (userId: string | null) => {
@@ -329,10 +333,11 @@ export const useChatStore = create<ChatState>()(
       },
 
       sendMessage: async (content: string, attachments?: Attachment[]) => {
+        // Get fresh client reference at the start
         const { 
           activeConversationId, 
           settings, 
-          openRouterClient,
+          openRouterClient: initialClient,
           userId,
           addMessage,
           updateMessage,
@@ -343,7 +348,7 @@ export const useChatStore = create<ChatState>()(
           createConversation,
         } = get();
 
-        if (!openRouterClient) {
+        if (!initialClient) {
           setError('Please configure your OpenRouter API key in settings');
           return;
         }
@@ -494,40 +499,68 @@ export const useChatStore = create<ChatState>()(
             }));
 
           // Stream response with real-time updates!
+          // Get fresh client reference right before making the request
+          const currentClient = get().openRouterClient;
+          if (!currentClient) {
+            setError('OpenRouter API key was removed during message send');
+            // Remove the failed assistant message
+            set((state) => ({
+              conversations: state.conversations.map((c) =>
+                c.id === conversationId
+                  ? { ...c, messages: c.messages.filter(m => m.id !== assistantMessageId) }
+                  : c
+              ),
+            }));
+            return;
+          }
+          
           let fullContent = '';
+          let isResolved = false;
           
           await new Promise<void>((resolve, reject) => {
-            const cleanup = openRouterClient.streamChatCompletionWithCallback(
+            const cleanup = currentClient.streamChatCompletionWithCallback(
               apiMessages,
               settings.selectedModel,
               settings.temperature,
               settings.maxTokens,
               // onChunk - called for each streamed token
               (chunk: string) => {
+                // Check if client still exists and request is still valid
+                if (isResolved) return;
                 fullContent += chunk;
                 updateMessage(assistantMessageId, fullContent, true);
               },
               // onDone - called when stream completes
               () => {
+                if (isResolved) return;
+                isResolved = true;
                 updateMessage(assistantMessageId, fullContent, false);
+                // Clear cleanup function
+                set({ activeRequestCleanup: null });
                 resolve();
               },
               // onError - called on error
               (error: Error) => {
+                if (isResolved) return;
+                isResolved = true;
+                // Clear cleanup function
+                set({ activeRequestCleanup: null });
                 reject(error);
               }
             );
             
-            // Store cleanup in case we need to cancel
-            // (could be extended to support cancellation)
+            // Store cleanup function so we can cancel if API key changes
+            set({ activeRequestCleanup: cleanup });
           });
           }
 
           // Generate title if this is the first message
+          // Get fresh client reference for title generation
+          const titleClient = get().openRouterClient;
           const currentConversation = get().conversations.find(c => c.id === conversationId);
-          if (currentConversation && currentConversation.messages.length <= 2 && currentConversation.title === 'New Chat') {
+          if (titleClient && currentConversation && currentConversation.messages.length <= 2 && currentConversation.title === 'New Chat') {
             try {
-              const title = await openRouterClient.generateTitle(content);
+              const title = await titleClient.generateTitle(content);
               updateConversationTitle(conversationId!, title);
             } catch {
               // Keep default title on error
@@ -547,6 +580,8 @@ export const useChatStore = create<ChatState>()(
           get().syncConversation(conversationId!);
         } catch (error: any) {
           setError(error.message || 'Failed to send message');
+          // Clear cleanup function on error
+          set({ activeRequestCleanup: null });
           // Remove the failed assistant message
           set((state) => ({
             conversations: state.conversations.map((c) =>
@@ -565,26 +600,76 @@ export const useChatStore = create<ChatState>()(
         set((state) => {
           const updatedSettings = { ...state.settings, ...newSettings };
           
-          // Update clients if API keys changed
+          // Update clients if API keys changed AND are different from current
           let openRouterClient = state.openRouterClient;
           let elevenLabsClient = state.elevenLabsClient;
+          let activeRequestCleanup = state.activeRequestCleanup;
           
+          // Only recreate OpenRouter client if key actually changed
           if (newSettings.openRouterApiKey !== undefined) {
-            openRouterClient = newSettings.openRouterApiKey 
-              ? createOpenRouterClient(newSettings.openRouterApiKey)
-              : null;
+            const newKey = newSettings.openRouterApiKey?.trim() || '';
+            const currentKey = state.settings.openRouterApiKey?.trim() || '';
+            
+            // Only recreate if key changed and is non-empty
+            if (newKey !== currentKey) {
+              // Abort any active requests before replacing client
+              if (activeRequestCleanup) {
+                try {
+                  activeRequestCleanup();
+                } catch (error) {
+                  console.error('Error cleaning up active request:', error);
+                }
+                activeRequestCleanup = null;
+              }
+              
+              try {
+                if (newKey && newKey.length > 0) {
+                  openRouterClient = createOpenRouterClient(newKey);
+                } else {
+                  openRouterClient = null;
+                }
+              } catch (error) {
+                console.error('Failed to create OpenRouter client:', error);
+                // Keep existing client on error
+                openRouterClient = state.openRouterClient;
+              }
+            }
           }
           
+          // Only recreate ElevenLabs client if key actually changed
           if (newSettings.elevenLabsApiKey !== undefined) {
-            elevenLabsClient = newSettings.elevenLabsApiKey
-              ? createElevenLabsClient(newSettings.elevenLabsApiKey)
-              : null;
+            const newKey = newSettings.elevenLabsApiKey?.trim() || '';
+            const currentKey = state.settings.elevenLabsApiKey?.trim() || '';
+            
+            // Only recreate if key changed and is non-empty
+            if (newKey !== currentKey) {
+              try {
+                if (newKey && newKey.length > 0) {
+                  // Stop any ongoing speech before replacing client
+                  if (elevenLabsClient) {
+                    elevenLabsClient.stop().catch(console.error);
+                  }
+                  elevenLabsClient = createElevenLabsClient(newKey);
+                } else {
+                  // Stop any ongoing speech before removing client
+                  if (elevenLabsClient) {
+                    elevenLabsClient.stop().catch(console.error);
+                  }
+                  elevenLabsClient = null;
+                }
+              } catch (error) {
+                console.error('Failed to create ElevenLabs client:', error);
+                // Keep existing client on error
+                elevenLabsClient = state.elevenLabsClient;
+              }
+            }
           }
           
           return {
             settings: updatedSettings,
             openRouterClient,
             elevenLabsClient,
+            activeRequestCleanup,
           };
         });
       },
@@ -651,21 +736,91 @@ export const useChatStore = create<ChatState>()(
       storage: createJSONStorage(() => AsyncStorage),
       partialize: (state) => ({
         // Persist everything needed for offline access
+        // Use fallbacks to ensure we never persist null/undefined
         userId: state.userId,
-        conversations: state.conversations,
-        settings: state.settings,
+        conversations: state.conversations || [],
+        settings: state.settings || DEFAULT_SETTINGS,
         activeConversationId: state.activeConversationId,
         lastSyncAt: state.lastSyncAt,
       }),
-      onRehydrateStorage: () => (state) => {
-        // Initialize clients after rehydration
+      onRehydrateStorage: () => (state, error) => {
+        // Handle rehydration errors
+        if (error) {
+          console.error('Storage rehydration error:', error);
+          // Return state with safe defaults on error
+          return {
+            settings: DEFAULT_SETTINGS,
+            conversations: [],
+            activeConversationId: null,
+            userId: null,
+            lastSyncAt: null,
+          };
+        }
+        
+        // Validate and fix state after rehydration
         if (state) {
-          state.initializeClients();
-          // Sync with cloud if user is logged in
-          if (state.userId) {
-            setTimeout(() => state.syncWithCloud(), 1000);
+          // Ensure settings exists and has all required fields
+          if (!state.settings || typeof state.settings !== 'object') {
+            console.warn('Invalid settings in storage, resetting to defaults');
+            state.settings = DEFAULT_SETTINGS;
+          } else {
+            // Merge with defaults to ensure all fields exist (handles version migrations)
+            state.settings = {
+              ...DEFAULT_SETTINGS,
+              ...state.settings,
+            };
+          }
+          
+          // Ensure conversations is an array
+          if (!Array.isArray(state.conversations)) {
+            console.warn('Invalid conversations in storage, resetting to empty array');
+            state.conversations = [];
+          }
+          
+          // Validate selectedModel exists in AVAILABLE_MODELS
+          if (state.settings.selectedModel) {
+            const modelExists = AVAILABLE_MODELS.some(m => m.id === state.settings.selectedModel);
+            if (!modelExists) {
+              console.warn('Invalid model in settings, resetting to default');
+              state.settings.selectedModel = DEFAULT_SETTINGS.selectedModel;
+            }
+          }
+          
+          // Validate selectedVoice exists in DEFAULT_VOICES
+          if (state.settings.selectedVoice) {
+            const voiceExists = DEFAULT_VOICES.some(v => v.voice_id === state.settings.selectedVoice);
+            if (!voiceExists) {
+              console.warn('Invalid voice in settings, resetting to default');
+              state.settings.selectedVoice = DEFAULT_SETTINGS.selectedVoice;
+            }
+          }
+          
+          // Ensure activeRequestCleanup is null (shouldn't persist)
+          state.activeRequestCleanup = null;
+          
+          // Initialize clients after rehydration with validated state (with error handling)
+          try {
+            if (state.initializeClients) {
+              state.initializeClients();
+            }
+          } catch (error) {
+            console.error('Error initializing clients:', error);
+            // Continue even if client initialization fails
+          }
+          
+          // Sync with cloud if user is logged in (with error handling)
+          if (state.userId && state.syncWithCloud) {
+            setTimeout(() => {
+              try {
+                state.syncWithCloud();
+              } catch (error) {
+                console.error('Error syncing with cloud on startup:', error);
+              }
+            }, 1000);
           }
         }
+        
+        return state;
       },
     }
   )

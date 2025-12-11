@@ -3,31 +3,31 @@
  * Main chat interface with message list, input, and sidebar
  */
 
-import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  View,
-  StyleSheet,
-  FlatList,
-  KeyboardAvoidingView,
-  Platform,
   Animated,
-  Text,
+  FlatList,
   Keyboard,
-  TouchableOpacity,
-  NativeSyntheticEvent,
+  KeyboardAvoidingView,
   NativeScrollEvent,
+  NativeSyntheticEvent,
+  Platform,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
-import { useChatStore } from '../store/chatStore';
-import { Message } from '../types';
-import { MessageBubble } from '../components/MessageBubble';
-import { ChatInput } from '../components/ChatInput';
 import { ChatHeader } from '../components/ChatHeader';
+import { ChatInput } from '../components/ChatInput';
 import { ConversationSidebar } from '../components/ConversationSidebar';
 import { EmptyChat } from '../components/EmptyChat';
+import { MessageBubble } from '../components/MessageBubble';
 import { VoiceMode } from '../components/VoiceMode';
+import { useChatStore } from '../store/chatStore';
+import { Message } from '../types';
 import { SettingsScreen } from './SettingsScreen';
 
 export const ChatScreen: React.FC = () => {
@@ -144,7 +144,7 @@ export const ChatScreen: React.FC = () => {
   };
 
   const handleVoiceModePress = () => {
-    if (settings.elevenLabsApiKey) {
+    if (settings?.elevenLabsApiKey) {
       setShowVoiceMode(true);
     } else {
       setError('Please add your ElevenLabs API key in settings to use voice mode');
@@ -232,7 +232,7 @@ export const ChatScreen: React.FC = () => {
 
           {/* Chat Input */}
           <ChatInput
-            onVoiceModePress={settings.voiceEnabled ? handleVoiceModePress : undefined}
+            onVoiceModePress={settings?.voiceEnabled ? handleVoiceModePress : undefined}
           />
         </KeyboardAvoidingView>
 

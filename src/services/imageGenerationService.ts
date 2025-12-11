@@ -23,57 +23,158 @@ export interface ImageGenerationOptions {
 }
 
 /**
+ * Normalize common misspellings and variations of action words
+ */
+const normalizeMessage = (message: string): string => {
+  let normalized = message.toLowerCase();
+  
+  // Common misspellings and variations of "generate"
+  const generateVariations = [
+    'genarate', 'genrate', 'generat', 'generete', 'genreate', 
+    'generarte', 'genereate', 'genertae', 'genearte', 'genaerte'
+  ];
+  generateVariations.forEach(variant => {
+    normalized = normalized.replace(new RegExp(variant, 'gi'), 'generate');
+  });
+  
+  // Common misspellings and variations of "create"
+  const createVariations = [
+    'creat', 'crate', 'cretae', 'cerate', 'creae', 'creaet'
+  ];
+  createVariations.forEach(variant => {
+    normalized = normalized.replace(new RegExp(variant, 'gi'), 'create');
+  });
+  
+  // Common misspellings and variations of "imagine"
+  const imagineVariations = [
+    'imagien', 'imagin', 'imgane', 'imaigne', 'imagnie'
+  ];
+  imagineVariations.forEach(variant => {
+    normalized = normalized.replace(new RegExp(variant, 'gi'), 'imagine');
+  });
+  
+  return normalized;
+};
+
+/**
  * Check if a message is requesting image generation
  */
 export const isImageGenerationRequest = (message: string): boolean => {
-  const lowerMessage = message.toLowerCase();
+  const normalizedMessage = normalizeMessage(message);
+  
+  // Expanded list of action words (including variations)
+  const actionWords = [
+    // Core actions
+    'generate', 'create', 'make', 'draw', 'paint', 'design', 
+    'produce', 'render', 'sketch', 'illustrate',
+    // Imagination/visualization
+    'imagine', 'visualize', 'envision', 'picture',
+    // Build/compose
+    'build', 'craft', 'compose', 'construct', 'form',
+    // Show/display
+    'show', 'display', 'present',
+    // Additional synonyms
+    'depict', 'portray', 'represent', 'render', 'fabricate',
+    // Slang/casual
+    'whip up', 'come up with', 'put together'
+  ];
+  
+  // Image-related keywords
+  const imageKeywords = [
+    'image', 'picture', 'photo', 'photograph', 'illustration', 
+    'art', 'artwork', 'drawing', 'visual', 'graphic',
+    'portrait', 'scene', 'depiction', 'representation',
+    'diagram', 'chart', 'graph'
+  ];
+  
+  // Build regex patterns with all action words
+  const actionWordsPattern = actionWords.join('|');
+  const imageKeywordsPattern = imageKeywords.join('|');
   
   // Common patterns for image generation requests (flexible matching)
   const patterns = [
-    // Direct commands - can appear anywhere
-    /(generate|create|make|draw|design|produce|render)\s+(an?\s+)?(image|picture|photo|illustration|art|artwork|drawing|visual)/i,
+    // Direct commands - action word + image keyword
+    new RegExp(`(${actionWordsPattern})\\s+(an?\\s+)?(${imageKeywordsPattern})`, 'i'),
     // "image/picture of" patterns
-    /(image|picture|photo|illustration)\s+of/i,
-    // "draw/paint me" patterns
-    /(draw|paint|sketch)\s+(me\s+)?(an?\s+)?/i,
+    new RegExp(`(${imageKeywordsPattern})\\s+of`, 'i'),
+    // "draw/paint/sketch me" patterns (standalone actions often imply image)
+    /(draw|paint|sketch|illustrate)\s+(me\s+)?(an?\s+)?/i,
     // Imagination patterns
-    /imagine\s+(an?\s+)?/i,
-    /visualize\s+(an?\s+)?/i,
-    // Request patterns - "can you", "please", "I want"
-    /(can you|could you|please|i want|i need|i'd like)\s+(to\s+)?(generate|create|make|draw|show|produce)\s+(an?\s+)?(image|picture|photo|visual)/i,
+    /(imagine|visualize|envision|picture)\s+(an?\s+)?/i,
+    // Request patterns - "can you", "please", "I want" + action + image
+    new RegExp(`(can you|could you|please|i want|i need|i'd like|i would like)\\s+(to\\s+)?(${actionWordsPattern})\\s+(an?\\s+)?(${imageKeywordsPattern})`, 'i'),
     // "show me" patterns
-    /show\s+me\s+(an?\s+)?(image|picture|photo|visual|what)/i,
-    // Simple "create/generate" + description (when image context is implied)
-    /^(generate|create|draw|paint|make)\s+[a-z]/i,
+    new RegExp(`show\\s+me\\s+(an?\\s+)?(${imageKeywordsPattern}|what)`, 'i'),
+    // Simple action + description (when image context is implied at start of message)
+    new RegExp(`^(${actionWordsPattern})\\s+[a-z]`, 'i'),
+    // Patterns with common prefixes like "can you generate"
+    new RegExp(`(can|could|will|would)\\s+you\\s+(${actionWordsPattern})`, 'i'),
+    // "I want to see" patterns
+    /i\s+(want|need|would like|'d like)\s+to\s+see/i,
+    // "Give me" + image
+    new RegExp(`give\\s+me\\s+(an?\\s+)?(${imageKeywordsPattern})`, 'i'),
   ];
 
-  return patterns.some(pattern => pattern.test(lowerMessage));
+  return patterns.some(pattern => pattern.test(normalizedMessage));
 };
 
 /**
  * Extract the image prompt from a generation request
  */
 export const extractImagePrompt = (message: string): string => {
+  // Normalize the message first to handle misspellings
+  let normalized = normalizeMessage(message);
+  
+  // Expanded action words and image keywords for extraction
+  const actionWords = [
+    'generate', 'create', 'make', 'draw', 'paint', 'design', 
+    'produce', 'render', 'sketch', 'illustrate', 'imagine', 
+    'visualize', 'envision', 'picture', 'build', 'craft', 
+    'compose', 'construct', 'form', 'show', 'display', 'present',
+    'depict', 'portray', 'represent', 'fabricate'
+  ];
+  const imageKeywords = [
+    'image', 'picture', 'photo', 'photograph', 'illustration', 
+    'art', 'artwork', 'drawing', 'visual', 'graphic',
+    'portrait', 'scene', 'depiction', 'representation'
+  ];
+  
+  const actionWordsPattern = actionWords.join('|');
+  const imageKeywordsPattern = imageKeywords.join('|');
+  
   // Remove common prefixes and request patterns
-  let prompt = message
+  let prompt = normalized
     // Remove polite prefixes
-    .replace(/^(can you|could you|please|i want|i need|i'd like)\s+(to\s+)?/i, '')
-    // Remove action + image type patterns
-    .replace(/^(generate|create|make|draw|design|produce|render|paint|sketch|show)\s+(me\s+)?(an?\s+)?(image|picture|photo|illustration|art|artwork|drawing|visual)\s+(of\s+)?/i, '')
+    .replace(/^(can you|could you|please|i want|i need|i'd like|i would like)\s+(to\s+)?/i, '')
+    // Remove action + image type patterns (with all variations)
+    .replace(new RegExp(`^(${actionWordsPattern})\\s+(me\\s+)?(an?\\s+)?(${imageKeywordsPattern})\\s+(of\\s+)?`, 'i'), '')
     // Remove simple action patterns
-    .replace(/^(image|picture|photo)\s+of\s+/i, '')
-    .replace(/^(draw|paint|sketch)\s+(me\s+)?(an?\s+)?/i, '')
-    .replace(/^(create|generate|make)\s+(me\s+)?(an?\s+)?/i, '')
-    .replace(/^imagine\s+(an?\s+)?/i, '')
-    .replace(/^visualize\s+(an?\s+)?/i, '')
+    .replace(new RegExp(`^(${imageKeywordsPattern})\\s+of\\s+`, 'i'), '')
+    .replace(/^(draw|paint|sketch|illustrate)\s+(me\s+)?(an?\s+)?/i, '')
+    .replace(new RegExp(`^(create|generate|make|build|craft)\\s+(me\\s+)?(an?\\s+)?`, 'i'), '')
+    .replace(/^(imagine|visualize|envision|picture)\s+(an?\s+)?/i, '')
     // Remove "show me" patterns
-    .replace(/^show\s+me\s+(an?\s+)?(image|picture|photo|visual)?\s*(of\s+)?/i, '')
+    .replace(new RegExp(`^show\\s+me\\s+(an?\\s+)?(${imageKeywordsPattern})?\\s*(of\\s+)?`, 'i'), '')
     .replace(/^show\s+me\s+what\s+/i, '')
+    // Remove "give me" patterns
+    .replace(new RegExp(`^give\\s+me\\s+(an?\\s+)?(${imageKeywordsPattern})\\s+(of\\s+)?`, 'i'), '')
+    // Remove "I want to see"
+    .replace(/^i\s+(want|need|would like|'d like)\s+to\s+see\s+/i, '')
     // Clean up
     .replace(/\s+looks?\s+like$/i, '') // "...looks like" at end
+    .replace(/\s+please$/i, '') // "...please" at end
     .trim();
 
-  // If nothing left, use the original message
+  // If nothing left or prompt is too short, use the original message
+  // But clean it up a bit first
+  if (!prompt || prompt.length < 3) {
+    // Try to extract from original message by removing obvious prefixes
+    prompt = message
+      .replace(/^(can you|could you|please|i want|i need|i'd like)\s+(to\s+)?/i, '')
+      .replace(/\s+please$/i, '')
+      .trim();
+  }
+
   return prompt || message;
 };
 

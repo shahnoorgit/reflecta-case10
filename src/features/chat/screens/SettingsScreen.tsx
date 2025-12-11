@@ -3,24 +3,24 @@
  * Settings modal for API keys, model selection, and preferences
  */
 
-import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  TextInput,
-  ScrollView,
-  Modal,
-  Switch,
-  Linking,
-} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
+import Slider from '@react-native-community/slider';
 import * as Haptics from 'expo-haptics';
+import { LinearGradient } from 'expo-linear-gradient';
+import React, { useCallback, useRef, useState } from 'react';
+import {
+  Linking,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { useChatStore } from '../store/chatStore';
 import { AVAILABLE_MODELS, DEFAULT_VOICES } from '../types';
-import Slider from '@react-native-community/slider';
 
 interface SettingsScreenProps {
   visible: boolean;
@@ -32,20 +32,104 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ visible, onClose
   const [showOpenRouterKey, setShowOpenRouterKey] = useState(false);
   const [showOpenAiKey, setShowOpenAiKey] = useState(false);
   const [showElevenLabsKey, setShowElevenLabsKey] = useState(false);
+  
+  // Local state for API keys to avoid updating store on every keystroke
+  // Use optional chaining and fallbacks to handle null/undefined settings
+  const [localOpenRouterKey, setLocalOpenRouterKey] = useState(settings?.openRouterApiKey || '');
+  const [localOpenAiKey, setLocalOpenAiKey] = useState(settings?.openAiApiKey || '');
+  const [localElevenLabsKey, setLocalElevenLabsKey] = useState(settings?.elevenLabsApiKey || '');
+  
+  // Debounce timers
+  const openRouterTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const openAiTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const elevenLabsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  
+  // Sync local state when settings prop changes (e.g., from outside)
+  // Only update if local state differs to avoid loops
+  // Use optional chaining to prevent crashes if settings is null/undefined
+  React.useEffect(() => {
+    const apiKey = settings?.openRouterApiKey || '';
+    if (localOpenRouterKey !== apiKey) {
+      setLocalOpenRouterKey(apiKey);
+    }
+  }, [settings?.openRouterApiKey]);
+  
+  React.useEffect(() => {
+    const apiKey = settings?.openAiApiKey || '';
+    if (localOpenAiKey !== apiKey) {
+      setLocalOpenAiKey(apiKey);
+    }
+  }, [settings?.openAiApiKey]);
+  
+  React.useEffect(() => {
+    const apiKey = settings?.elevenLabsApiKey || '';
+    if (localElevenLabsKey !== apiKey) {
+      setLocalElevenLabsKey(apiKey);
+    }
+  }, [settings?.elevenLabsApiKey]);
 
   const handleSettingChange = (key: string, value: any) => {
-    if (settings.hapticFeedback) {
+    if (settings?.hapticFeedback) {
       Haptics.selectionAsync();
     }
     updateSettings({ [key]: value });
   };
+  
+  // Debounced handlers for API keys
+  const handleOpenRouterKeyChange = useCallback((text: string) => {
+    setLocalOpenRouterKey(text);
+    
+    // Clear existing timer
+    if (openRouterTimerRef.current) {
+      clearTimeout(openRouterTimerRef.current);
+    }
+    
+    // Set new timer to update store after user stops typing (500ms)
+    openRouterTimerRef.current = setTimeout(() => {
+      updateSettings({ openRouterApiKey: text });
+    }, 500);
+  }, [updateSettings]);
+  
+  const handleOpenAiKeyChange = useCallback((text: string) => {
+    setLocalOpenAiKey(text);
+    
+    if (openAiTimerRef.current) {
+      clearTimeout(openAiTimerRef.current);
+    }
+    
+    openAiTimerRef.current = setTimeout(() => {
+      updateSettings({ openAiApiKey: text });
+    }, 500);
+  }, [updateSettings]);
+  
+  const handleElevenLabsKeyChange = useCallback((text: string) => {
+    setLocalElevenLabsKey(text);
+    
+    if (elevenLabsTimerRef.current) {
+      clearTimeout(elevenLabsTimerRef.current);
+    }
+    
+    elevenLabsTimerRef.current = setTimeout(() => {
+      updateSettings({ elevenLabsApiKey: text });
+    }, 500);
+  }, [updateSettings]);
+  
+  // Cleanup timers on unmount
+  React.useEffect(() => {
+    return () => {
+      if (openRouterTimerRef.current) clearTimeout(openRouterTimerRef.current);
+      if (openAiTimerRef.current) clearTimeout(openAiTimerRef.current);
+      if (elevenLabsTimerRef.current) clearTimeout(elevenLabsTimerRef.current);
+    };
+  }, []);
 
   const openLink = (url: string) => {
     Linking.openURL(url);
   };
 
-  const selectedModel = AVAILABLE_MODELS.find(m => m.id === settings.selectedModel);
-  const selectedVoice = DEFAULT_VOICES.find(v => v.voice_id === settings.selectedVoice);
+  // Use optional chaining and fallbacks to prevent crashes
+  const selectedModel = AVAILABLE_MODELS.find(m => m.id === (settings?.selectedModel || '')) || AVAILABLE_MODELS[1];
+  const selectedVoice = DEFAULT_VOICES.find(v => v.voice_id === (settings?.selectedVoice || '')) || DEFAULT_VOICES[0];
 
   return (
     <Modal
@@ -90,8 +174,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ visible, onClose
                     style={styles.input}
                     placeholder="sk-or-..."
                     placeholderTextColor="#5A5A6A"
-                    value={settings.openRouterApiKey}
-                    onChangeText={(text) => handleSettingChange('openRouterApiKey', text)}
+                    value={localOpenRouterKey}
+                    onChangeText={handleOpenRouterKeyChange}
                     secureTextEntry={!showOpenRouterKey}
                     autoCapitalize="none"
                     autoCorrect={false}
@@ -124,8 +208,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ visible, onClose
                     style={styles.input}
                     placeholder="sk-..."
                     placeholderTextColor="#5A5A6A"
-                    value={settings.openAiApiKey}
-                    onChangeText={(text) => handleSettingChange('openAiApiKey', text)}
+                    value={localOpenAiKey}
+                    onChangeText={handleOpenAiKeyChange}
                     secureTextEntry={!showOpenAiKey}
                     autoCapitalize="none"
                     autoCorrect={false}
@@ -159,8 +243,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ visible, onClose
                     style={styles.input}
                     placeholder="Your ElevenLabs API key..."
                     placeholderTextColor="#5A5A6A"
-                    value={settings.elevenLabsApiKey}
-                    onChangeText={(text) => handleSettingChange('elevenLabsApiKey', text)}
+                    value={localElevenLabsKey}
+                    onChangeText={handleElevenLabsKeyChange}
                     secureTextEntry={!showElevenLabsKey}
                     autoCapitalize="none"
                     autoCorrect={false}
@@ -187,7 +271,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ visible, onClose
               <View style={styles.sliderGroup}>
                 <View style={styles.sliderHeader}>
                   <Text style={styles.inputLabel}>Temperature</Text>
-                  <Text style={styles.sliderValue}>{settings.temperature.toFixed(1)}</Text>
+                  <Text style={styles.sliderValue}>{(settings?.temperature ?? 0.7).toFixed(1)}</Text>
                 </View>
                 <Text style={styles.sliderDescription}>
                   Higher values make output more creative, lower values more focused
@@ -197,7 +281,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ visible, onClose
                     style={styles.slider}
                     minimumValue={0}
                     maximumValue={2}
-                    value={settings.temperature}
+                    value={settings?.temperature ?? 0.7}
                     onValueChange={(value) => handleSettingChange('temperature', value)}
                     minimumTrackTintColor="#10A37F"
                     maximumTrackTintColor="#3A3A4A"
@@ -210,7 +294,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ visible, onClose
               <View style={styles.sliderGroup}>
                 <View style={styles.sliderHeader}>
                   <Text style={styles.inputLabel}>Max Tokens</Text>
-                  <Text style={styles.sliderValue}>{settings.maxTokens}</Text>
+                  <Text style={styles.sliderValue}>{settings?.maxTokens ?? 4096}</Text>
                 </View>
                 <Text style={styles.sliderDescription}>
                   Maximum length of the response
@@ -221,7 +305,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ visible, onClose
                     minimumValue={256}
                     maximumValue={8192}
                     step={256}
-                    value={settings.maxTokens}
+                    value={settings?.maxTokens ?? 4096}
                     onValueChange={(value) => handleSettingChange('maxTokens', value)}
                     minimumTrackTintColor="#10A37F"
                     maximumTrackTintColor="#3A3A4A"
@@ -248,7 +332,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ visible, onClose
                       key={voice.voice_id}
                       style={[
                         styles.voiceChip,
-                        voice.voice_id === settings.selectedVoice && styles.voiceChipSelected,
+                        voice.voice_id === (settings?.selectedVoice || '') && styles.voiceChipSelected,
                       ]}
                       onPress={() => handleSettingChange('selectedVoice', voice.voice_id)}
                     >
@@ -277,10 +361,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ visible, onClose
                   <Text style={styles.toggleLabel}>Haptic Feedback</Text>
                 </View>
                 <Switch
-                  value={settings.hapticFeedback}
+                  value={settings?.hapticFeedback ?? true}
                   onValueChange={(value) => handleSettingChange('hapticFeedback', value)}
                   trackColor={{ false: '#3A3A4A', true: 'rgba(16, 163, 127, 0.5)' }}
-                  thumbColor={settings.hapticFeedback ? '#10A37F' : '#8E8EA0'}
+                  thumbColor={(settings?.hapticFeedback ?? true) ? '#10A37F' : '#8E8EA0'}
                 />
               </View>
 
@@ -291,10 +375,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ visible, onClose
                   <Text style={styles.toggleLabel}>Voice Mode</Text>
                 </View>
                 <Switch
-                  value={settings.voiceEnabled}
+                  value={settings?.voiceEnabled ?? true}
                   onValueChange={(value) => handleSettingChange('voiceEnabled', value)}
                   trackColor={{ false: '#3A3A4A', true: 'rgba(16, 163, 127, 0.5)' }}
-                  thumbColor={settings.voiceEnabled ? '#10A37F' : '#8E8EA0'}
+                  thumbColor={(settings?.voiceEnabled ?? true) ? '#10A37F' : '#8E8EA0'}
                 />
               </View>
             </View>

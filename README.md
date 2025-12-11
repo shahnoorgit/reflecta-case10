@@ -175,11 +175,34 @@ npm start
 
 ### Environment Setup
 
+#### Option 1: Using pushenv (Recommended) 🔒
+
+[pushenv](https://github.com/shahnoorgit/pushenv) is an open-source tool (maintained by the author of this project) that lets you securely share and manage environment variables with encrypted storage. Perfect for team collaboration!
+
+```bash
+# Install pushenv globally
+npm i -g pushenv
+
+# Pull encrypted environment variables (creates .env file automatically)
+pushenv pull
+
+# When prompted, enter the passphrase: reflecta
+```
+
+This will automatically create a `.env` file with all required environment variables. The tool uses encryption to safely store and share sensitive configuration data.
+
+**Note**: pushenv is an open-source project created and maintained by the maintainer of Reflecta Chat for secure environment variable management across teams.
+
+#### Option 2: Manual Setup
+
+If you prefer to set up environment variables manually:
+
 1. **Create `.env` file** in the project root:
 ```env
 # Required
 EXPO_PUBLIC_SUPABASE_URL=your_supabase_url
-EXPO_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_keyEXPO_PUBLIC_OPENROUTER_API_KEY=your_openrouter_key
+EXPO_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+EXPO_PUBLIC_OPENROUTER_API_KEY=your_openrouter_key
 
 # Optional (can also be set in Settings UI)
 EXPO_PUBLIC_ELEVENLABS_API_KEY=your_elevenlabs_key
@@ -444,6 +467,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [Supabase](https://supabase.com) for backend infrastructure
 - [Expo](https://expo.dev) for the amazing React Native platform
 - [Pollinations](https://pollinations.ai) for free image generation
+- [pushenv](https://github.com/shahnoorgit/pushenv) - Open-source tool for secure environment variable management (created and maintained by the maintainer of this project)
 
 ---
 
