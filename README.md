@@ -175,47 +175,62 @@ npm start
 
 ### Environment Setup
 
-1. **Create `.env` file** (optional, for Supabase):
+1. **Create `.env` file** in the project root:
 ```env
+# Required
 EXPO_PUBLIC_SUPABASE_URL=your_supabase_url
-EXPO_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+EXPO_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_keyEXPO_PUBLIC_OPENROUTER_API_KEY=your_openrouter_key
+
+# Optional (can also be set in Settings UI)
+EXPO_PUBLIC_ELEVENLABS_API_KEY=your_elevenlabs_key
+EXPO_PUBLIC_DEEPSEEK_API_KEY=your_deepseek_key
+EXPO_PUBLIC_OPENAI_API_KEY=your_openai_key
+
 ```
 
-2. **Configure Supabase** (optional, for cloud sync):
+2. **Configure Supabase** (required for cloud sync):
    - Create a Supabase project at [supabase.com](https://supabase.com)
    - Set up tables: `conversations`, `messages`, `attachments`
    - Create storage bucket: `chat-attachments`
-   - Add environment variables
+   - Add `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY` to `.env`
 
 ### API Keys Setup
 
 #### Required
 
-1. **OpenRouter API Key** (Required for chat)
+1. **OpenRouter API Key** (Required for chat to work)
    - Go to [OpenRouter](https://openrouter.ai/keys)
    - Create an account and generate an API key
    - Add credits to your account
-   - Add the key in Settings → API Keys
+   - Add to `.env` as `EXPO_PUBLIC_OPENROUTER_API_KEY` OR set in Settings → API Keys
+   - **Note**: Must be set in either `.env` or Settings for chat to function
+
+2. **Supabase** (Required for cloud sync and authentication)
+   - Create project at [supabase.com](https://supabase.com)
+   - Get URL and anon key
+   - Add to `.env` as `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY`
 
 #### Optional
 
-2. **OpenAI API Key** (For Whisper speech-to-text)
-   - Go to [OpenAI Platform](https://platform.openai.com/api-keys)
-   - Create an API key
-   - Add the key in Settings → API Keys
-   - Used for voice transcription
-
-3. **ElevenLabs API Key** (For text-to-speech)
+3. **ElevenLabs API Key** (For text-to-speech in voice mode)
    - Go to [ElevenLabs](https://elevenlabs.io)
    - Create an account and navigate to API settings
    - Copy your API key
-   - Add the key in Settings → API Keys
+   - Add to `.env` as `EXPO_PUBLIC_ELEVENLABS_API_KEY` OR set in Settings → API Keys
    - Used for voice responses
 
-4. **Supabase** (For cloud sync)
-   - Create project at [supabase.com](https://supabase.com)
-   - Get URL and anon key
-   - Add to `.env` file
+4. **DeepSeek API Key** (For conversation summarization)
+   - Go to [DeepSeek](https://platform.deepseek.com)
+   - Create an account and generate an API key
+   - Add to `.env` as `EXPO_PUBLIC_DEEPSEEK_API_KEY` OR set in Settings → API Keys
+   - Used for rolling context window summaries
+
+5. **OpenAI API Key** (For DALL-E image generation fallback)
+   - Go to [OpenAI Platform](https://platform.openai.com/api-keys)
+   - Create an API key
+   - Add to `.env` as `EXPO_PUBLIC_OPENAI_API_KEY` (NOT available in Settings UI)
+   - Used as fallback when Pollinations AI fails (Pollinations is free and works without this key)
+   - **Note**: Image generation works without this key using free Pollinations AI
 
 ## 🛠️ Tech Stack
 
