@@ -42,15 +42,15 @@ export const GLASS_COLORS = {
     },
   },
   
-  // Purple accent (AI messages, highlights)
+  // Medical blue accent (AI messages, highlights) - #3B82F6
   purple: {
-    light: 'rgba(155, 138, 255, 0.15)',   // Light purple backgrounds
-    medium: 'rgba(155, 138, 255, 0.2)',   // Medium purple backgrounds
-    strong: 'rgba(155, 138, 255, 0.25)',   // Strong purple backgrounds
+    light: 'rgba(59, 130, 246, 0.15)',   // Light medical blue backgrounds
+    medium: 'rgba(59, 130, 246, 0.2)',   // Medium medical blue backgrounds
+    strong: 'rgba(59, 130, 246, 0.25)',   // Strong medical blue backgrounds
     border: {
-      light: 'rgba(155, 138, 255, 0.25)', // Light purple borders
-      medium: 'rgba(155, 138, 255, 0.3)', // Medium purple borders
-      strong: 'rgba(155, 138, 255, 0.4)', // Strong purple borders
+      light: 'rgba(59, 130, 246, 0.25)', // Light medical blue borders
+      medium: 'rgba(59, 130, 246, 0.3)', // Medium medical blue borders
+      strong: 'rgba(59, 130, 246, 0.4)', // Strong medical blue borders
     },
   },
   

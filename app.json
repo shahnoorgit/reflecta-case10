@@ -1,11 +1,11 @@
 {
   "expo": {
     "name": "NovaDoc",
-    "slug": "NovaDoc",
+    "slug": "novadoc",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "reflectachat",
+    "scheme": "novadoc",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "splash": {
@@ -15,10 +15,10 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.reflecta.chat",
+      "bundleIdentifier": "com.shahnoor.novadoc",
       "infoPlist": {
-        "NSMicrophoneUsageDescription": "Allow Reflecta Chat to access your microphone for voice mode",
-        "NSSpeechRecognitionUsageDescription": "Allow Reflecta Chat to use speech recognition for voice mode"
+        "NSMicrophoneUsageDescription": "Allow NovaDoc to access your microphone for voice consultations",
+        "NSSpeechRecognitionUsageDescription": "Allow NovaDoc to use speech recognition for voice consultations"
       }
     },
     "android": {
@@ -42,7 +42,7 @@
       [
         "expo-av",
         {
-          "microphonePermission": "Allow Reflecta Chat to access your microphone for voice mode."
+          "microphonePermission": "Allow NovaDoc to access your microphone for voice consultations."
         }
       ]
     ],

@@ -14,19 +14,18 @@ import {
   Animated,
   Image,
   Keyboard,
-  Modal,
   Platform,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GLASS_COLORS, GLASS_SHADOWS } from '../../../theme/glassmorphism';
 import { useChatStore } from '../store/chatStore';
-import { Attachment, AVAILABLE_MODELS } from '../types';
+import { Attachment } from '../types';
 
 interface ChatInputProps {
   onVoiceModePress?: () => void;
@@ -37,22 +36,11 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onVoiceModePress }) => {
   const [inputHeight, setInputHeight] = useState(44);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [showAttachMenu, setShowAttachMenu] = useState(false);
-  const [showModelPicker, setShowModelPicker] = useState(false);
   
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const insets = useSafeAreaInsets();
   
-  const { sendMessage, isLoading, settings, updateSettings } = useChatStore();
-  
-  const selectedModel = AVAILABLE_MODELS.find(m => m.id === settings.selectedModel);
-  
-  const handleModelSelect = (modelId: string) => {
-    if (settings.hapticFeedback) {
-      Haptics.selectionAsync();
-    }
-    updateSettings({ selectedModel: modelId });
-    setShowModelPicker(false);
-  };
+  const { sendMessage, isLoading, settings } = useChatStore();
 
   // Generate unique ID
   const generateId = () => Math.random().toString(36).substring(2, 15);
@@ -82,7 +70,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onVoiceModePress }) => {
         name: asset.fileName || 'image.jpg',
         mimeType: asset.mimeType || 'image/jpeg',
         size: asset.fileSize,
-        base64: asset.base64,
+        base64: asset.base64 || undefined,
       }));
       
       setAttachments(prev => [...prev, ...newAttachments]);
@@ -114,7 +102,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onVoiceModePress }) => {
         name: 'photo.jpg',
         mimeType: asset.mimeType || 'image/jpeg',
         size: asset.fileSize,
-        base64: asset.base64,
+        base64: asset.base64 || undefined,
       };
       
       setAttachments(prev => [...prev, newAttachment]);
@@ -183,19 +171,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onVoiceModePress }) => {
             />
           )}
           <View style={styles.containerContent}>
-          {/* Model Selector - Above input field */}
-          <TouchableOpacity
-            style={styles.modelSelector}
-            onPress={() => setShowModelPicker(true)}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="sparkles" size={14} color="#9B8AFF" />
-            <Text style={styles.modelSelectorText} numberOfLines={1}>
-              {selectedModel?.name || 'Select Model'}
-            </Text>
-            <Ionicons name="chevron-down" size={14} color="#8E8EA0" />
-          </TouchableOpacity>
-
           {/* Attachment Previews */}
           {attachments.length > 0 && (
             <ScrollView 
@@ -253,7 +228,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onVoiceModePress }) => {
               onPress={onVoiceModePress}
             >
               <LinearGradient
-                colors={['#9B8AFF', '#6B5BFF']}
+                          colors={['#3B82F6', '#2563EB']}
                 style={styles.voiceModeGradient}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
@@ -301,7 +276,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onVoiceModePress }) => {
               
               <TouchableOpacity style={styles.attachMenuItem} onPress={pickImage}>
                 <View style={[styles.attachMenuIcon, { backgroundColor: GLASS_COLORS.purple.medium }]}>
-                  <Ionicons name="image-outline" size={24} color="#9B8AFF" />
+                  <Ionicons name="image-outline" size={24} color="#3B82F6" />
                 </View>
                 <Text style={styles.attachMenuText}>Gallery</Text>
               </TouchableOpacity>
@@ -310,57 +285,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onVoiceModePress }) => {
           </View>
         </View>
       </View>
-
-      {/* Model Picker Modal */}
-      <Modal
-        visible={showModelPicker}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowModelPicker(false)}
-      >
-        <TouchableOpacity
-          style={styles.modalBackdrop}
-          activeOpacity={1}
-          onPress={() => setShowModelPicker(false)}
-        >
-          <View style={styles.modelPickerContainer}>
-            <View style={styles.modelPickerHeader}>
-              <Text style={styles.modelPickerTitle}>Select Model</Text>
-              <TouchableOpacity
-                onPress={() => setShowModelPicker(false)}
-                style={styles.modalCloseButton}
-              >
-                <Ionicons name="close" size={24} color="#8E8EA0" />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView style={styles.modelList}>
-              {AVAILABLE_MODELS.map((model) => (
-                <TouchableOpacity
-                  key={model.id}
-                  style={[
-                    styles.modelItem,
-                    model.id === settings.selectedModel && styles.modelItemSelected,
-                  ]}
-                  onPress={() => handleModelSelect(model.id)}
-                >
-                  <View style={styles.modelInfo}>
-                    <View style={styles.modelNameRow}>
-                      <Text style={styles.modelItemName}>{model.name}</Text>
-                      <Text style={styles.modelProvider}>{model.provider}</Text>
-                    </View>
-                    <Text style={styles.modelDescription}>{model.description}</Text>
-                  </View>
-                  
-                  {model.id === settings.selectedModel && (
-                    <Ionicons name="checkmark-circle" size={24} color="#10A37F" />
-                  )}
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        </TouchableOpacity>
-      </Modal>
     </>
   );
 };
@@ -386,105 +310,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingTop: 12,
     paddingBottom: 8,
-  },
-  modelSelector: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    backgroundColor: GLASS_COLORS.purple.light,
-    borderWidth: 1,
-    borderColor: GLASS_COLORS.purple.border.light,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 12,
-    marginBottom: 8,
-    gap: 6,
-    ...GLASS_SHADOWS.subtle,
-  },
-  modelSelectorText: {
-    color: '#ECECF1',
-    fontSize: 13,
-    fontWeight: '600',
-    maxWidth: 120,
-  },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: GLASS_COLORS.backdrop.medium,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  modelPickerContainer: {
-    width: '100%',
-    maxWidth: 400,
-    backgroundColor: GLASS_COLORS.background.medium,
-    borderWidth: 1,
-    borderColor: GLASS_COLORS.border.medium,
-    borderRadius: 20,
-    maxHeight: '70%',
-    overflow: 'hidden',
-    ...GLASS_SHADOWS.heavy,
-  },
-  modelPickerHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: GLASS_COLORS.border.subtle,
-  },
-  modelPickerTitle: {
-    color: '#ECECF1',
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  modalCloseButton: {
-    padding: 4,
-  },
-  modelList: {
-    padding: 12,
-  },
-  modelItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 8,
-    backgroundColor: GLASS_COLORS.neutral.medium,
-    borderWidth: 1,
-    borderColor: GLASS_COLORS.border.light,
-  },
-  modelItemSelected: {
-    backgroundColor: GLASS_COLORS.accent.green.light,
-    borderWidth: 1,
-    borderColor: GLASS_COLORS.accent.green.border.medium,
-  },
-  modelInfo: {
-    flex: 1,
-    marginRight: 12,
-  },
-  modelNameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  modelItemName: {
-    color: '#ECECF1',
-    fontSize: 16,
-    fontWeight: '600',
-    marginRight: 8,
-  },
-  modelProvider: {
-    color: '#8E8EA0',
-    fontSize: 12,
-    backgroundColor: 'rgba(142, 142, 160, 0.1)',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  modelDescription: {
-    color: '#8E8EA0',
-    fontSize: 13,
   },
   attachmentPreview: {
     marginBottom: 12,

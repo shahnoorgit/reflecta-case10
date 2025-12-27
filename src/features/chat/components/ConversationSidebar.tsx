@@ -320,7 +320,7 @@ export const ConversationSidebar: React.FC<ConversationSidebarProps> = ({
               <Ionicons
                 name="search"
                 size={18}
-                color={isSearchFocused ? '#9B8AFF' : '#8E8EA0'}
+                          color={isSearchFocused ? '#3B82F6' : '#8E8EA0'}
                 style={styles.searchIcon}
               />
               <TextInput
@@ -390,7 +390,7 @@ export const ConversationSidebar: React.FC<ConversationSidebarProps> = ({
                             <Ionicons
                               name={result.message.role === 'user' ? 'person' : 'sparkles'}
                               size={14}
-                              color={result.message.role === 'user' ? '#10A37F' : '#9B8AFF'}
+                                    color={result.message.role === 'user' ? '#10A37F' : '#3B82F6'}
                               style={styles.searchResultIcon}
                             />
                             <Text style={styles.searchResultConversationTitle} numberOfLines={1}>
@@ -597,7 +597,7 @@ const styles = StyleSheet.create({
     ...GLASS_SHADOWS.subtle,
   },
   searchInputWrapperFocused: {
-    borderColor: '#9B8AFF',
+    borderColor: '#3B82F6',
     backgroundColor: GLASS_COLORS.purple.light,
   },
   searchIcon: {
@@ -620,7 +620,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   clearSearchText: {
-    color: '#9B8AFF',
+    color: '#3B82F6',
     fontSize: 14,
     fontWeight: '500',
   },
@@ -670,7 +670,7 @@ const styles = StyleSheet.create({
     marginLeft: 20,
   },
   searchResultHighlight: {
-    backgroundColor: '#9B8AFF',
+    backgroundColor: '#3B82F6',
     color: '#FFFFFF',
     fontWeight: '600',
   },

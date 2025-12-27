@@ -48,9 +48,7 @@ export interface ChatSettings {
   openRouterApiKey: string;
   openAiApiKey: string; // For Whisper speech-to-text
   elevenLabsApiKey: string;
-  selectedModel: string;
-  temperature: number;
-  maxTokens: number;
+  selectedModel: string; // Deprecated - kept for backward compatibility, not used
   voiceEnabled: boolean;
   selectedVoice: string;
   hapticFeedback: boolean;
@@ -129,35 +127,35 @@ export const AVAILABLE_MODELS: ChatModel[] = [
   {
     id: 'openai/gpt-4o',
     name: 'GPT-4o',
-    description: 'Most capable model, great for complex tasks',
+    description: 'Best for complex medical questions and analysis',
     provider: 'OpenAI',
     contextLength: 128000,
   },
   {
     id: 'openai/gpt-4o-mini',
     name: 'GPT-4o Mini',
-    description: 'Fast and affordable for everyday tasks',
+    description: 'Fast responses for general health queries',
     provider: 'OpenAI',
     contextLength: 128000,
   },
   {
     id: 'anthropic/claude-3.5-sonnet',
     name: 'Claude 3.5 Sonnet',
-    description: 'Excellent for nuanced conversations',
+    description: 'Excellent for detailed health information',
     provider: 'Anthropic',
     contextLength: 200000,
   },
   {
     id: 'google/gemini-pro-1.5',
     name: 'Gemini Pro 1.5',
-    description: 'Google\'s advanced multimodal model',
+    description: 'Great for comprehensive medical consultations',
     provider: 'Google',
     contextLength: 1000000,
   },
   {
     id: 'meta-llama/llama-3.1-70b-instruct',
     name: 'Llama 3.1 70B',
-    description: 'Open source powerhouse',
+    description: 'Good for general health questions',
     provider: 'Meta',
     contextLength: 131072,
   },

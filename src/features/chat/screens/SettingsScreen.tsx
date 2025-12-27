@@ -22,6 +22,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GLASS_COLORS, GLASS_SHADOWS } from '../../../theme/glassmorphism';
 import { useChatStore } from '../store/chatStore';
+import { HealthProfileScreen } from '../../health/components/HealthProfileScreen';
 
 interface SettingsScreenProps {
   visible: boolean;
@@ -34,6 +35,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ visible, onClose
   const [showOpenRouterKey, setShowOpenRouterKey] = useState(false);
   const [showOpenAiKey, setShowOpenAiKey] = useState(false);
   const [showElevenLabsKey, setShowElevenLabsKey] = useState(false);
+  const [showHealthProfile, setShowHealthProfile] = useState(false);
   
   // Local state for API keys to avoid updating store on every keystroke
   // Use optional chaining and fallbacks to handle null/undefined settings
@@ -154,6 +156,28 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ visible, onClose
             style={[styles.content, { position: 'relative', zIndex: 1 }]} 
             showsVerticalScrollIndicator={false}
           >
+            {/* Health Profile Section */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Ionicons name="medical-outline" size={24} color="#3B82F6" />
+                <Text style={styles.sectionTitle}>Health Profile</Text>
+              </View>
+              <Text style={styles.sectionDescription}>
+                Manage your health information for personalized medical consultations
+              </Text>
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={() => setShowHealthProfile(true)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.actionButtonLeft}>
+                  <Ionicons name="medical-outline" size={20} color="#3B82F6" />
+                  <Text style={styles.actionButtonText}>Manage Health Profile</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color="#8E8EA0" />
+              </TouchableOpacity>
+            </View>
+
             {/* API Keys Section */}
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
@@ -161,7 +185,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ visible, onClose
                 <Text style={styles.sectionTitle}>API Keys</Text>
               </View>
               <Text style={styles.sectionDescription}>
-                Add your API keys to enable AI chat and voice features
+                Add your API keys to enable health consultation and voice features
               </Text>
 
               {/* OpenRouter API Key */}
@@ -240,7 +264,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ visible, onClose
                     />
                   </TouchableOpacity>
                 </View>
-                <Text style={styles.inputHint}>Required for voice transcription (Whisper)</Text>
+                <Text style={styles.inputHint}>Required for voice transcription during health consultations</Text>
               </View>
 
               {/* ElevenLabs API Key */}
@@ -280,7 +304,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ visible, onClose
                     />
                   </TouchableOpacity>
                 </View>
-                <Text style={styles.inputHint}>Required for voice output (TTS)</Text>
+                <Text style={styles.inputHint}>Required for voice output during health consultations</Text>
               </View>
             </View>
 
@@ -289,6 +313,12 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ visible, onClose
           </ScrollView>
         </LinearGradient>
       </View>
+
+      {/* Health Profile Modal */}
+      <HealthProfileScreen
+        visible={showHealthProfile}
+        onClose={() => setShowHealthProfile(false)}
+      />
     </Modal>
   );
 };
@@ -411,6 +441,28 @@ const styles = StyleSheet.create({
   },
   eyeButton: {
     padding: 12,
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: GLASS_COLORS.secondary.light,
+    borderWidth: 1,
+    borderColor: GLASS_COLORS.border.medium,
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 12,
+    ...GLASS_SHADOWS.subtle,
+  },
+  actionButtonLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  actionButtonText: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#ECECF1',
   },
 });
 

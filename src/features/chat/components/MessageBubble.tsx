@@ -378,11 +378,11 @@ export const MessageBubble = memo<MessageBubbleProps>(({ message, isLast }) => {
       {!isUser && message.isStreaming && (
         <View style={styles.assistantAvatarContainer}>
           <View style={[styles.avatar, styles.assistantAvatar]}>
-            <Ionicons
-              name="sparkles"
-              size={16}
-              color="#9B8AFF"
-            />
+                    <Ionicons
+                      name="medical"
+                      size={16}
+                      color="#3B82F6"
+                    />
           </View>
         </View>
       )}
@@ -651,10 +651,10 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#9B8AFF',
-    marginLeft: 4,
-    marginBottom: 6,
-    shadowColor: '#9B8AFF',
+            backgroundColor: '#3B82F6',
+            marginLeft: 4,
+            marginBottom: 6,
+            shadowColor: '#3B82F6',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.8,
     shadowRadius: 6,
@@ -677,11 +677,11 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     gap: 6,
   },
-  typingDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#9B8AFF',
-  },
+          typingDot: {
+            width: 8,
+            height: 8,
+            borderRadius: 4,
+            backgroundColor: '#3B82F6',
+          },
 });
 

@@ -3,39 +3,39 @@
  * Displayed when no conversation is active or conversation is empty
  */
 
-import React, { useRef, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Animated,
-} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
+import { LinearGradient } from 'expo-linear-gradient';
+import React, { useEffect, useRef } from 'react';
+import {
+  Animated,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { useChatStore } from '../store/chatStore';
 
 const SUGGESTIONS = [
   {
-    icon: 'bulb-outline',
-    title: 'Explain a concept',
-    prompt: 'Explain quantum computing in simple terms',
+    icon: 'medical-outline',
+    title: 'Symptom question',
+    prompt: 'I have a headache, what could cause it?',
   },
   {
-    icon: 'code-slash',
-    title: 'Help me code',
-    prompt: 'Write a function to sort an array in JavaScript',
+    icon: 'flask-outline',
+    title: 'Medication info',
+    prompt: 'Tell me about common side effects of aspirin',
   },
   {
-    icon: 'create-outline',
-    title: 'Write something',
-    prompt: 'Write a professional email to request time off',
+    icon: 'moon-outline',
+    title: 'Wellness advice',
+    prompt: 'What are some ways to improve sleep quality?',
   },
   {
-    icon: 'search-outline',
-    title: 'Research a topic',
-    prompt: 'What are the latest trends in AI?',
+    icon: 'heart-outline',
+    title: 'Health condition',
+    prompt: 'Explain what diabetes is in simple terms',
   },
 ];
 
@@ -86,19 +86,19 @@ export const EmptyChat: React.FC = () => {
       {/* Logo/Icon */}
       <View style={styles.logoContainer}>
         <LinearGradient
-          colors={['#9B8AFF', '#6B5BFF']}
+          colors={['#3B82F6', '#2563EB']}
           style={styles.logoGradient}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
         >
-          <Ionicons name="sparkles" size={40} color="#FFFFFF" />
+          <Ionicons name="medical" size={40} color="#FFFFFF" />
         </LinearGradient>
       </View>
 
       {/* Title */}
-      <Text style={styles.title}>How can I help you today?</Text>
+      <Text style={styles.title}>How can I help with your health today?</Text>
       <Text style={styles.subtitle}>
-        Start a conversation or try one of these suggestions
+        Ask about symptoms, medications, wellness, or general health questions
       </Text>
 
       {/* Suggestions Grid */}
@@ -127,7 +127,7 @@ export const EmptyChat: React.FC = () => {
               activeOpacity={0.7}
             >
               <View style={styles.suggestionIcon}>
-                <Ionicons name={suggestion.icon as any} size={20} color="#9B8AFF" />
+                <Ionicons name={suggestion.icon as any} size={20} color="#3B82F6" />
               </View>
               <Text style={styles.suggestionTitle}>{suggestion.title}</Text>
               <Text style={styles.suggestionPrompt} numberOfLines={2}>
@@ -157,7 +157,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#9B8AFF',
+    shadowColor: '#3B82F6',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.3,
     shadowRadius: 16,

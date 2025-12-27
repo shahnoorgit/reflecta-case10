@@ -31,6 +31,8 @@ import { VoiceMode } from '../components/VoiceMode';
 import { useChatStore } from '../store/chatStore';
 import { Message } from '../types';
 import { SettingsScreen } from './SettingsScreen';
+import { MedicalDisclaimer } from '../../../components/shared/MedicalDisclaimer';
+import { EmergencyWarning } from '../../../components/shared/EmergencyWarning';
 
 export const ChatScreen: React.FC = () => {
   const flatListRef = useRef<FlatList>(null);
@@ -56,6 +58,7 @@ export const ChatScreen: React.FC = () => {
   const messages = activeConversation?.messages || [];
   const lastMessage = messages[messages.length - 1];
   const isStreaming = lastMessage?.isStreaming;
+  const lastUserMessage = [...messages].reverse().find(m => m.role === 'user');
 
   // Memoize reversed messages for inverted FlatList
   const reversedMessages = useMemo(() => [...messages].reverse(), [messages]);
@@ -301,6 +304,14 @@ export const ChatScreen: React.FC = () => {
           visible={showVoiceMode}
           onClose={() => setShowVoiceMode(false)}
         />
+
+        {/* Medical Disclaimer Modal */}
+        <MedicalDisclaimer variant="modal" />
+
+        {/* Emergency Warning */}
+        {lastUserMessage && (
+          <EmergencyWarning message={lastUserMessage.content || ''} />
+        )}
       </LinearGradient>
     </View>
   );

@@ -221,7 +221,7 @@ export class OpenRouterClient {
    * Generate a conversation title from the first message
    */
   async generateTitle(firstMessage: string): Promise<string> {
-    const prompt = `Generate a very short (3-5 words max) title for a conversation that starts with: "${firstMessage.slice(0, 200)}". Return ONLY the title, nothing else.`;
+    const prompt = `Generate a very short (3-5 words max) health-related title for this medical consultation that starts with: "${firstMessage.slice(0, 200)}". Return ONLY the title, nothing else. Examples: "Headache Consultation", "Medication Question", "Sleep Advice".`;
     
     try {
       const title = await this.chatCompletion(

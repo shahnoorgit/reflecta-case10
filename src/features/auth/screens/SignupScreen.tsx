@@ -154,7 +154,7 @@ export const SignupScreen: React.FC<SignupScreenProps> = ({ onSwitchToLogin }) =
     if (password.length === 0) return { label: '', color: '#6B6B7B', width: 0 };
     if (password.length < 4) return { label: 'Weak', color: '#FF6B6B', width: 25 };
     if (password.length < 6) return { label: 'Fair', color: '#FFB86C', width: 50 };
-    if (password.length < 8) return { label: 'Good', color: '#9B8AFF', width: 75 };
+    if (password.length < 8) return { label: 'Good', color: '#3B82F6', width: 75 };
     return { label: 'Strong', color: '#10A37F', width: 100 };
   };
 
@@ -206,14 +206,14 @@ export const SignupScreen: React.FC<SignupScreenProps> = ({ onSwitchToLogin }) =
             >
               <View style={styles.logoContainer}>
                 <LinearGradient
-                  colors={['#10A37F', '#059669']}
+                  colors={['#3B82F6', '#2563EB']}
                   style={styles.logoGradient}
                 >
-                  <Ionicons name="sparkles" size={32} color="#FFFFFF" />
+                  <Ionicons name="medical" size={32} color="#FFFFFF" />
                 </LinearGradient>
               </View>
-              <Text style={styles.title}>Create Account</Text>
-              <Text style={styles.subtitle}>Start your AI conversation journey</Text>
+              <Text style={styles.title}>NovaDoc</Text>
+              <Text style={styles.subtitle}>Join your AI Health Assistant</Text>
             </Animated.View>
 
             {/* Error Message */}
@@ -239,7 +239,7 @@ export const SignupScreen: React.FC<SignupScreenProps> = ({ onSwitchToLogin }) =
                 <Ionicons
                   name="person-outline"
                   size={20}
-                  color={focusedField === 'name' ? '#10A37F' : '#6B6B7B'}
+                  color={focusedField === 'name' ? '#3B82F6' : '#6B6B7B'}
                 />
                 <TextInput
                   style={styles.input}
@@ -264,7 +264,7 @@ export const SignupScreen: React.FC<SignupScreenProps> = ({ onSwitchToLogin }) =
                 <Ionicons
                   name="mail-outline"
                   size={20}
-                  color={focusedField === 'email' ? '#10A37F' : '#6B6B7B'}
+                  color={focusedField === 'email' ? '#3B82F6' : '#6B6B7B'}
                 />
                 <TextInput
                   style={styles.input}
@@ -290,7 +290,7 @@ export const SignupScreen: React.FC<SignupScreenProps> = ({ onSwitchToLogin }) =
                 <Ionicons
                   name="lock-closed-outline"
                   size={20}
-                  color={focusedField === 'password' ? '#10A37F' : '#6B6B7B'}
+                  color={focusedField === 'password' ? '#3B82F6' : '#6B6B7B'}
                 />
                 <TextInput
                   style={styles.input}
@@ -342,9 +342,9 @@ export const SignupScreen: React.FC<SignupScreenProps> = ({ onSwitchToLogin }) =
                   size={20}
                   color={
                     confirmPassword && password === confirmPassword
-                      ? '#10A37F'
+                      ? '#3B82F6'
                       : focusedField === 'confirmPassword'
-                      ? '#10A37F'
+                      ? '#3B82F6'
                       : '#6B6B7B'
                   }
                 />
@@ -360,7 +360,7 @@ export const SignupScreen: React.FC<SignupScreenProps> = ({ onSwitchToLogin }) =
                   autoCapitalize="none"
                 />
                 {confirmPassword && password === confirmPassword && (
-                  <Ionicons name="checkmark-circle" size={20} color="#10A37F" />
+                  <Ionicons name="checkmark-circle" size={20} color="#3B82F6" />
                 )}
               </View>
 
@@ -372,7 +372,7 @@ export const SignupScreen: React.FC<SignupScreenProps> = ({ onSwitchToLogin }) =
                 activeOpacity={0.8}
               >
                 <LinearGradient
-                  colors={['#10A37F', '#059669']}
+                  colors={['#3B82F6', '#2563EB']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
                   style={styles.signupButtonGradient}
@@ -434,10 +434,10 @@ const styles = StyleSheet.create({
   orb1: {
     width: 280,
     height: 280,
-    backgroundColor: '#10A37F',
+    backgroundColor: '#3B82F6',
     top: -80,
     right: -80,
-    shadowColor: '#10A37F',
+    shadowColor: '#3B82F6',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.5,
     shadowRadius: 100,
@@ -445,10 +445,10 @@ const styles = StyleSheet.create({
   orb2: {
     width: 180,
     height: 180,
-    backgroundColor: '#059669',
+    backgroundColor: '#2563EB',
     bottom: 150,
     left: -40,
-    shadowColor: '#059669',
+    shadowColor: '#2563EB',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.5,
     shadowRadius: 80,
@@ -466,7 +466,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#10A37F',
+    shadowColor: '#3B82F6',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.4,
     shadowRadius: 16,
@@ -513,12 +513,12 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   inputFocused: {
-    borderColor: '#10A37F',
-    backgroundColor: 'rgba(16, 163, 127, 0.05)',
+    borderColor: '#3B82F6',
+    backgroundColor: 'rgba(59, 130, 246, 0.05)',
   },
   inputSuccess: {
-    borderColor: '#10A37F',
-    backgroundColor: 'rgba(16, 163, 127, 0.08)',
+    borderColor: '#3B82F6',
+    backgroundColor: 'rgba(59, 130, 246, 0.08)',
   },
   input: {
     flex: 1,
@@ -552,7 +552,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
     borderRadius: 16,
     overflow: 'hidden',
-    shadowColor: '#10A37F',
+    shadowColor: '#3B82F6',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.3,
     shadowRadius: 16,
@@ -578,7 +578,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   termsLink: {
-    color: '#10A37F',
+    color: '#3B82F6',
     fontWeight: '500',
   },
   loginContainer: {
@@ -591,7 +591,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   loginLink: {
-    color: '#10A37F',
+    color: '#3B82F6',
     fontSize: 15,
     fontWeight: '600',
   },

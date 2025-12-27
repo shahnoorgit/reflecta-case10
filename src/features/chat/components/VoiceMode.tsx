@@ -411,7 +411,7 @@ export const VoiceMode: React.FC<VoiceModeProps> = ({ visible, onClose }) => {
   const getStatusColor = () => {
     if (error) return '#FF6B6B';
     if (isListening) return '#10A37F';
-    if (isProcessing) return '#9B8AFF';
+    if (isProcessing) return '#3B82F6';
     if (isSpeaking) return '#6B5BFF';
     return '#8E8EA0';
   };
@@ -503,7 +503,7 @@ export const VoiceMode: React.FC<VoiceModeProps> = ({ visible, onClose }) => {
                       : isListening
                         ? ['#10A37F', '#0D8A6A']
                         : isProcessing
-                          ? ['#9B8AFF', '#6B5BFF']
+                          ? ['#3B82F6', '#2563EB']
                           : ['#3D3D4A', '#2D2D3A']
                   }
                   style={styles.circleGradient}
@@ -641,7 +641,7 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     borderRadius: CIRCLE_SIZE / 2,
-    shadowColor: '#9B8AFF',
+    shadowColor: '#3B82F6',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.4,
     shadowRadius: 20,
@@ -730,7 +730,7 @@ const styles = StyleSheet.create({
     padding: 14,
   },
   responseLabel: {
-    color: '#9B8AFF',
+    color: '#3B82F6',
     fontSize: 11,
     fontWeight: '600',
     marginBottom: 4,

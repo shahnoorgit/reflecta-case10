@@ -28,6 +28,8 @@ import {
 import { ElevenLabsClient, createElevenLabsClient } from '../api/elevenLabsClient';
 import { OpenRouterClient, buildMessageContent, createOpenRouterClient } from '../api/openRouterClient';
 import { AVAILABLE_MODELS, Attachment, ChatSettings, Conversation, DEFAULT_VOICES, Message, VoiceState } from '../types';
+import { useHealthProfileStore } from '../../health/store/healthProfileStore';
+import { extractHealthInfo } from '../../../services/healthExtractionService';
 
 const generateId = () => Math.random().toString(36).substring(2) + Date.now().toString(36);
 
@@ -106,13 +108,15 @@ const DEFAULT_SETTINGS: ChatSettings = {
   openRouterApiKey: '',
   openAiApiKey: '',
   elevenLabsApiKey: '',
-  selectedModel: AVAILABLE_MODELS[1].id, // GPT-4o Mini
-  temperature: 0.7,
-  maxTokens: 4096,
+  selectedModel: AVAILABLE_MODELS[1].id, // Deprecated - kept for backward compatibility
   voiceEnabled: true,
   selectedVoice: DEFAULT_VOICES[0].voice_id,
   hapticFeedback: true,
 };
+
+// Default AI parameters - optimized for medical consultations
+const DEFAULT_TEMPERATURE = 0.7; // Balanced creativity/accuracy for medical info
+const DEFAULT_MAX_TOKENS = 4096; // Sufficient for detailed medical responses
 
 const DEFAULT_VOICE_STATE: VoiceState = {
   isRecording: false,
@@ -311,7 +315,7 @@ export const useChatStore = create<ChatState>()(
           messages: [],
           createdAt: Date.now(),
           updatedAt: Date.now(),
-          model: get().settings.selectedModel,
+          model: 'openai/gpt-4o-mini', // Using GPT-4o Mini - best balance of cost and quality for medical consultations
           userId: userId || undefined,
           syncStatus: 'pending',
         };
@@ -585,12 +589,79 @@ export const useChatStore = create<ChatState>()(
           // This prevents failed messages from being resent and causing 400 errors
           const validMessages: Message[] = [];
           
+          // Check if system message exists in conversation
+          const hasSystemMessage = conversation.messages.some(m => m.role === 'system');
+          
+          // Build medical system prompt with user health context
+          if (!hasSystemMessage) {
+            const healthContext = useHealthProfileStore.getState().getHealthContext();
+            const systemPrompt = `You are a helpful medical AI assistant. Provide general health information, answer questions about symptoms, medications, and wellness. Always remind users to consult with qualified healthcare professionals for diagnosis and treatment. This is not a substitute for professional medical advice, diagnosis, or treatment. Never prescribe medications or provide definitive diagnoses.
+
+For medical emergencies, please call emergency services immediately.
+
+${healthContext}`.trim();
+
+            const systemMessage: Message = {
+              id: generateId(),
+              role: 'system',
+              content: systemPrompt,
+              timestamp: Date.now(),
+            };
+
+            // Add system message to conversation
+            set((state) => ({
+              conversations: state.conversations.map((c) =>
+                c.id === conversationId
+                  ? { ...c, messages: [systemMessage, ...c.messages], updatedAt: Date.now() }
+                  : c
+              ),
+            }));
+
+            validMessages.push(systemMessage);
+          } else {
+            // Update existing system message with latest health context
+            const existingSystemMessage = conversation.messages.find(m => m.role === 'system');
+            if (existingSystemMessage) {
+              const healthContext = useHealthProfileStore.getState().getHealthContext();
+              const systemPrompt = `You are a helpful medical AI assistant. Provide general health information, answer questions about symptoms, medications, and wellness. Always remind users to consult with qualified healthcare professionals for diagnosis and treatment. This is not a substitute for professional medical advice, diagnosis, or treatment. Never prescribe medications or provide definitive diagnoses.
+
+For medical emergencies, please call emergency services immediately.
+
+${healthContext}`.trim();
+
+              // Update system message in conversation
+              set((state) => ({
+                conversations: state.conversations.map((c) =>
+                  c.id === conversationId
+                    ? {
+                        ...c,
+                        messages: c.messages.map(m =>
+                          m.role === 'system'
+                            ? { ...m, content: systemPrompt }
+                            : m
+                        ),
+                        updatedAt: Date.now(),
+                      }
+                    : c
+                ),
+              }));
+
+              validMessages.push({
+                ...existingSystemMessage,
+                content: systemPrompt,
+              });
+            }
+          }
+          
           // Process messages in order, tracking which user messages have responses
           for (let i = 0; i < conversation.messages.length; i++) {
             const msg = conversation.messages[i];
             
             // Skip the current assistant placeholder
             if (msg.id === assistantMessageId) continue;
+            
+            // Skip existing system messages (we handle system message above)
+            if (msg.role === 'system') continue;
             
             if (msg.role === 'user') {
               // Check if this user message has a completed assistant response after it
@@ -669,9 +740,9 @@ export const useChatStore = create<ChatState>()(
           await new Promise<void>((resolve, reject) => {
             const cleanup = currentClient.streamChatCompletionWithCallback(
               apiMessages,
-              settings.selectedModel,
-              settings.temperature,
-              settings.maxTokens,
+              'openai/gpt-4o-mini', // Using GPT-4o Mini - best balance of cost and quality
+              DEFAULT_TEMPERATURE,
+              DEFAULT_MAX_TOKENS,
               // onChunk - called for each streamed token
               (chunk: string) => {
                 // Check if client still exists and request is still valid
@@ -701,6 +772,29 @@ export const useChatStore = create<ChatState>()(
             // Store cleanup function so we can cancel if API key changes
             set({ activeRequestCleanup: cleanup });
           });
+          }
+
+          // Extract health information from user message and update profile
+          try {
+            const extracted = extractHealthInfo(content);
+            const healthStore = useHealthProfileStore.getState();
+            
+            // Add extracted health info to profile
+            for (const symptom of extracted.symptoms) {
+              await healthStore.addSymptom(symptom);
+            }
+            for (const condition of extracted.conditions) {
+              await healthStore.addCondition(condition);
+            }
+            for (const medication of extracted.medications) {
+              await healthStore.addMedication(medication);
+            }
+            for (const allergy of extracted.allergies) {
+              await healthStore.addAllergy(allergy);
+            }
+          } catch (error) {
+            // Don't block message sending if extraction fails
+            console.error('Failed to extract health info:', error);
           }
 
           // Generate title if this is the first message
@@ -948,14 +1042,7 @@ export const useChatStore = create<ChatState>()(
             state.conversations = [];
           }
           
-          // Validate selectedModel exists in AVAILABLE_MODELS
-          if (state.settings.selectedModel) {
-            const modelExists = AVAILABLE_MODELS.some(m => m.id === state.settings.selectedModel);
-            if (!modelExists) {
-              console.warn('Invalid model in settings, resetting to default');
-              state.settings.selectedModel = DEFAULT_SETTINGS.selectedModel;
-            }
-          }
+          // Model is now hardcoded to GPT-4o Mini - no validation needed
           
           // Validate selectedVoice exists in DEFAULT_VOICES
           if (state.settings.selectedVoice) {

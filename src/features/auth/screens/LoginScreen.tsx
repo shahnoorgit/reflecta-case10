@@ -168,14 +168,14 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
           >
             <View style={styles.logoContainer}>
               <LinearGradient
-                colors={['#9B8AFF', '#6366F1']}
+                colors={['#3B82F6', '#2563EB']}
                 style={styles.logoGradient}
               >
-                <Ionicons name="chatbubbles" size={32} color="#FFFFFF" />
+                <Ionicons name="medical" size={32} color="#FFFFFF" />
               </LinearGradient>
             </View>
-            <Text style={styles.title}>Welcome Back</Text>
-            <Text style={styles.subtitle}>Sign in to continue your conversations</Text>
+            <Text style={styles.title}>NovaDoc</Text>
+            <Text style={styles.subtitle}>Your AI Health Assistant</Text>
           </Animated.View>
 
           {/* Error Message */}
@@ -201,7 +201,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               <Ionicons
                 name="mail-outline"
                 size={20}
-                color={focusedField === 'email' ? '#9B8AFF' : '#6B6B7B'}
+                color={focusedField === 'email' ? '#3B82F6' : '#6B6B7B'}
               />
               <TextInput
                 style={styles.input}
@@ -227,7 +227,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               <Ionicons
                 name="lock-closed-outline"
                 size={20}
-                color={focusedField === 'password' ? '#9B8AFF' : '#6B6B7B'}
+                color={focusedField === 'password' ? '#3B82F6' : '#6B6B7B'}
               />
               <TextInput
                 style={styles.input}
@@ -265,7 +265,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               activeOpacity={0.8}
             >
               <LinearGradient
-                colors={['#9B8AFF', '#6366F1']}
+                colors={['#3B82F6', '#2563EB']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={styles.loginButtonGradient}
@@ -281,25 +281,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               </LinearGradient>
             </TouchableOpacity>
 
-            {/* Divider */}
-            <View style={styles.divider}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>or continue with</Text>
-              <View style={styles.dividerLine} />
-            </View>
-
-            {/* Social Login */}
-            <View style={styles.socialButtons}>
-              <TouchableOpacity style={styles.socialButton}>
-                <Ionicons name="logo-google" size={22} color="#ECECF1" />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.socialButton}>
-                <Ionicons name="logo-apple" size={22} color="#ECECF1" />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.socialButton}>
-                <Ionicons name="logo-github" size={22} color="#ECECF1" />
-              </TouchableOpacity>
-            </View>
           </View>
 
           {/* Sign Up Link */}
@@ -334,10 +315,10 @@ const styles = StyleSheet.create({
   orb1: {
     width: 300,
     height: 300,
-    backgroundColor: '#9B8AFF',
+    backgroundColor: '#3B82F6',
     top: -100,
     right: -100,
-    shadowColor: '#9B8AFF',
+    shadowColor: '#3B82F6',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.5,
     shadowRadius: 100,
@@ -345,10 +326,10 @@ const styles = StyleSheet.create({
   orb2: {
     width: 200,
     height: 200,
-    backgroundColor: '#6366F1',
+    backgroundColor: '#2563EB',
     bottom: 100,
     left: -50,
-    shadowColor: '#6366F1',
+    shadowColor: '#2563EB',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.5,
     shadowRadius: 80,
@@ -366,7 +347,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#9B8AFF',
+    shadowColor: '#3B82F6',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.4,
     shadowRadius: 16,
@@ -413,8 +394,8 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   inputFocused: {
-    borderColor: '#9B8AFF',
-    backgroundColor: 'rgba(155, 138, 255, 0.05)',
+    borderColor: '#3B82F6',
+    backgroundColor: 'rgba(59, 130, 246, 0.05)',
   },
   input: {
     flex: 1,
@@ -425,7 +406,7 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-end',
   },
   forgotPasswordText: {
-    color: '#9B8AFF',
+    color: '#3B82F6',
     fontSize: 14,
     fontWeight: '500',
   },
@@ -433,7 +414,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
     borderRadius: 16,
     overflow: 'hidden',
-    shadowColor: '#9B8AFF',
+    shadowColor: '#3B82F6',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.3,
     shadowRadius: 16,
@@ -451,36 +432,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#FFFFFF',
   },
-  divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 24,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  dividerText: {
-    color: '#6B6B7B',
-    fontSize: 13,
-    marginHorizontal: 16,
-  },
-  socialButtons: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 16,
-  },
-  socialButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-  },
   signupContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
@@ -492,7 +443,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   signupLink: {
-    color: '#9B8AFF',
+    color: '#3B82F6',
     fontSize: 15,
     fontWeight: '600',
   },
