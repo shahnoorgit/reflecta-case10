@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Reflecta Chat",
-    "slug": "reflecta-chat",
+    "name": "NovaDoc",
+    "slug": "NovaDoc",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -22,7 +22,7 @@
       }
     },
     "android": {
-      "package": "com.reflecta.chat",
+      "package": "com.shahnoor.novadoc",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#0F0F1E"

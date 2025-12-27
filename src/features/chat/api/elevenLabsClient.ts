@@ -123,12 +123,17 @@ export class ElevenLabsClient {
   async stop(): Promise<void> {
     if (this.sound) {
       try {
-        await this.sound.stopAsync();
-        await this.sound.unloadAsync();
-      } catch {
-        // Ignore errors when stopping
+        const status = await this.sound.getStatusAsync();
+        if (status.isLoaded) {
+          await this.sound.stopAsync();
+          await this.sound.unloadAsync();
+        }
+      } catch (error) {
+        // Ignore errors when stopping - audio might already be stopped
+        console.log('Error stopping audio (ignored):', error);
+      } finally {
+        this.sound = null;
       }
-      this.sound = null;
     }
   }
 

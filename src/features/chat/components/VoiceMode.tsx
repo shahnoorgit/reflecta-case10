@@ -11,6 +11,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Dimensions,
+  Linking,
   Modal,
   StyleSheet,
   Text,
@@ -18,6 +19,7 @@ import {
   View
 } from 'react-native';
 import { useChatStore } from '../store/chatStore';
+import { parseElevenLabsError } from '../../../utils/errorUtils';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CIRCLE_SIZE = SCREEN_WIDTH * 0.5;
@@ -35,6 +37,13 @@ export const VoiceMode: React.FC<VoiceModeProps> = ({ visible, onClose }) => {
   const [response, setResponse] = useState('');
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [audioLevel, setAudioLevel] = useState(0);
+  
+  // Silence detection refs
+  const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const lastAudioLevelRef = useRef(0);
+  const silenceStartTimeRef = useRef<number | null>(null);
+  const hasDetectedSpeechRef = useRef(false);
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const rotateAnim = useRef(new Animated.Value(0)).current;
@@ -149,6 +158,12 @@ export const VoiceMode: React.FC<VoiceModeProps> = ({ visible, onClose }) => {
   };
 
   const startListening = async () => {
+    // If already listening, stop it
+    if (isListening && recording) {
+      await stopListening();
+      return;
+    }
+
     try {
       // Check if OpenAI API key is set
       if (!settings.openAiApiKey) {
@@ -157,12 +172,16 @@ export const VoiceMode: React.FC<VoiceModeProps> = ({ visible, onClose }) => {
       }
 
       if (settings.hapticFeedback) {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       }
 
       setError(null);
       setTranscript('');
       setResponse('');
+      setAudioLevel(0);
+      lastAudioLevelRef.current = 0;
+      silenceStartTimeRef.current = null;
+      hasDetectedSpeechRef.current = false;
 
       const permission = await Audio.requestPermissionsAsync();
       if (!permission.granted) {
@@ -175,11 +194,55 @@ export const VoiceMode: React.FC<VoiceModeProps> = ({ visible, onClose }) => {
         playsInSilentModeIOS: true,
       });
 
-      const { recording } = await Audio.Recording.createAsync(
-        Audio.RecordingOptionsPresets.HIGH_QUALITY
+      const { recording: newRecording } = await Audio.Recording.createAsync(
+        {
+          ...Audio.RecordingOptionsPresets.HIGH_QUALITY,
+          isMeteringEnabled: true, // Enable audio level monitoring
+        }
       );
 
-      setRecording(recording);
+      // Monitor audio levels for silence detection
+      newRecording.setOnRecordingStatusUpdate((status) => {
+        if (status.isRecording && status.metering !== undefined) {
+          // Convert metering (-160 to 0 dB) to 0-1 scale
+          const normalizedLevel = Math.max(0, (status.metering + 160) / 160);
+          setAudioLevel(normalizedLevel);
+          
+          // Detect if user has started speaking (audio above threshold)
+          const SPEECH_THRESHOLD = 0.08; // Minimum level to consider as speech
+          if (normalizedLevel > SPEECH_THRESHOLD) {
+            hasDetectedSpeechRef.current = true;
+          }
+          
+          // Detect silence (very low audio level) - only after speech detected
+          const SILENCE_THRESHOLD = 0.05; // Very quiet
+          const SILENCE_DURATION = 2000; // 2 seconds of silence
+          
+          if (hasDetectedSpeechRef.current && normalizedLevel < SILENCE_THRESHOLD) {
+            // Start or continue silence timer
+            if (silenceStartTimeRef.current === null) {
+              silenceStartTimeRef.current = Date.now();
+            } else {
+              const silenceDuration = Date.now() - silenceStartTimeRef.current;
+              if (silenceDuration >= SILENCE_DURATION) {
+                // Auto-stop after silence (only if speech was detected)
+                stopListening();
+              }
+            }
+          } else {
+            // Audio detected, reset silence timer
+            silenceStartTimeRef.current = null;
+            if (silenceTimerRef.current) {
+              clearTimeout(silenceTimerRef.current);
+              silenceTimerRef.current = null;
+            }
+          }
+          
+          lastAudioLevelRef.current = normalizedLevel;
+        }
+      });
+
+      setRecording(newRecording);
       setIsListening(true);
     } catch (err) {
       console.error('Failed to start recording:', err);
@@ -191,11 +254,19 @@ export const VoiceMode: React.FC<VoiceModeProps> = ({ visible, onClose }) => {
     if (!recording) return;
 
     try {
+      // Clear silence detection timers
+      if (silenceTimerRef.current) {
+        clearTimeout(silenceTimerRef.current);
+        silenceTimerRef.current = null;
+      }
+      silenceStartTimeRef.current = null;
+
       if (settings.hapticFeedback) {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       }
 
       setIsListening(false);
+      setAudioLevel(0);
       setIsProcessing(true);
 
       await recording.stopAndUnloadAsync();
@@ -275,11 +346,13 @@ export const VoiceMode: React.FC<VoiceModeProps> = ({ visible, onClose }) => {
             setIsSpeaking(true);
             try {
               console.log('Starting TTS for:', assistantMessage.content.slice(0, 50) + '...');
+              // speakMessage will automatically stop any existing playback
               await speakMessage(assistantMessage.content);
               console.log('TTS completed');
             } catch (err: any) {
               console.error('TTS error:', err);
-              setError(`Voice playback failed: ${err.message || 'Unknown error'}`);
+              const errorInfo = parseElevenLabsError(err);
+              setError(errorInfo.message);
             } finally {
               setIsSpeaking(false);
             }
@@ -304,6 +377,12 @@ export const VoiceMode: React.FC<VoiceModeProps> = ({ visible, onClose }) => {
   };
 
   const handleClose = async () => {
+    // Clear any timers
+    if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = null;
+    }
+    
     await stopSpeaking();
     if (recording) {
       try {
@@ -317,6 +396,7 @@ export const VoiceMode: React.FC<VoiceModeProps> = ({ visible, onClose }) => {
     setTranscript('');
     setResponse('');
     setError(null);
+    setAudioLevel(0);
     onClose();
   };
 
@@ -325,7 +405,7 @@ export const VoiceMode: React.FC<VoiceModeProps> = ({ visible, onClose }) => {
     if (isProcessing) return 'Processing...';
     if (isSpeaking) return 'Speaking...';
     if (error) return 'Tap to try again';
-    return 'Hold to speak';
+    return 'Tap to speak';
   };
 
   const getStatusColor = () => {
@@ -406,8 +486,7 @@ export const VoiceMode: React.FC<VoiceModeProps> = ({ visible, onClose }) => {
             {/* Main Circle Button */}
             <TouchableOpacity
               style={styles.mainCircle}
-              onPressIn={startListening}
-              onPressOut={stopListening}
+              onPress={startListening}
               activeOpacity={0.9}
               disabled={isProcessing || isSpeaking}
             >
@@ -479,9 +558,36 @@ export const VoiceMode: React.FC<VoiceModeProps> = ({ visible, onClose }) => {
           {/* Instructions */}
           <Animated.View style={[styles.instructionsContainer, { opacity: fadeAnim }]}>
             <Text style={styles.instructions}>
-              {error ? 'Tap the button to try again' : 'Hold to speak, release to send'}
+              {error 
+                ? 'Tap the button to try again' 
+                : isListening 
+                  ? 'Tap again to stop, or wait for silence'
+                  : 'Tap to start speaking'}
             </Text>
           </Animated.View>
+          
+          {/* Audio Level Indicator (when listening) */}
+          {isListening && (
+            <Animated.View 
+              style={[
+                styles.audioLevelIndicator,
+                { 
+                  opacity: fadeAnim,
+                  transform: [{ scale: 0.5 + audioLevel * 0.5 }] 
+                }
+              ]}
+            >
+              <View 
+                style={[
+                  styles.audioLevelBar,
+                  { 
+                    width: `${Math.min(100, audioLevel * 100)}%`,
+                    backgroundColor: audioLevel > 0.1 ? '#10A37F' : '#5A5A6A'
+                  }
+                ]} 
+              />
+            </Animated.View>
+          )}
         </LinearGradient>
       </View>
     </Modal>
@@ -564,11 +670,42 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 16,
     marginBottom: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 68, 68, 0.3)',
+  },
+  errorHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+    gap: 8,
+  },
+  errorTitle: {
+    color: '#FF6B6B',
+    fontSize: 16,
+    fontWeight: '600',
   },
   errorText: {
     color: '#FF6B6B',
     fontSize: 14,
-    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  errorActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    backgroundColor: 'rgba(255, 68, 68, 0.2)',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 68, 68, 0.4)',
+  },
+  errorActionText: {
+    color: '#FF6B6B',
+    fontSize: 13,
+    fontWeight: '600',
   },
   transcriptBubble: {
     backgroundColor: 'rgba(16, 163, 127, 0.15)',
@@ -611,5 +748,20 @@ const styles = StyleSheet.create({
     color: '#5A5A6A',
     fontSize: 13,
     textAlign: 'center',
+  },
+  audioLevelIndicator: {
+    position: 'absolute',
+    bottom: 100,
+    left: 40,
+    right: 40,
+    height: 4,
+    backgroundColor: 'rgba(142, 142, 160, 0.2)',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  audioLevelBar: {
+    height: '100%',
+    borderRadius: 2,
+    transition: 'width 0.1s ease',
   },
 });

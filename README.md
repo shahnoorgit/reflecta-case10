@@ -177,7 +177,7 @@ npm start
 
 #### Option 1: Using pushenv (Recommended) 🔒
 
-[pushenv](https://github.com/shahnoorgit/pushenv) is an open-source tool (maintained by the author of this project) that lets you securely share and manage environment variables with encrypted storage. Perfect for team collaboration!
+[pushenv](https://github.com/shahnoorgit/pushenv) is an open-source tool (maintained by shahnoor mujawar) that lets you securely share and manage environment variables with encrypted storage. Perfect for team collaboration!
 
 ```bash
 # Install pushenv globally
@@ -191,7 +191,7 @@ pushenv pull
 
 This will automatically create a `.env` file with all required environment variables. The tool uses encryption to safely store and share sensitive configuration data.
 
-**Note**: pushenv is an open-source project created and maintained by the maintainer of Reflecta Chat for secure environment variable management across teams.
+**Note**: pushenv is an open-source project created and maintained by shahnoor mujawar for secure environment variable management across teams.
 
 #### Option 2: Manual Setup
 
@@ -467,7 +467,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [Supabase](https://supabase.com) for backend infrastructure
 - [Expo](https://expo.dev) for the amazing React Native platform
 - [Pollinations](https://pollinations.ai) for free image generation
-- [pushenv](https://github.com/shahnoorgit/pushenv) - Open-source tool for secure environment variable management (created and maintained by the maintainer of this project)
+- [pushenv](https://github.com/shahnoorgit/pushenv) - Open-source tool for secure environment variable management (maintained by shahnoor mujawar)
 
 ---
 

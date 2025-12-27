@@ -3,32 +3,32 @@
  * Renders individual chat messages with typing animation and actions
  */
 
-import React, { useEffect, useRef, memo, useCallback, useState } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import { BlurView } from 'expo-blur';
+import * as Clipboard from 'expo-clipboard';
+import * as Haptics from 'expo-haptics';
+import React, { memo, useEffect, useRef, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Animated,
-  Easing,
-  LayoutAnimation,
-  Platform,
-  UIManager,
-  Image,
-  ScrollView,
-  Dimensions,
-  ActivityIndicator,
+    Animated,
+    Easing,
+    LayoutAnimation,
+    Platform,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    UIManager,
+    View,
 } from 'react-native';
+import { GLASS_COLORS, GLASS_SHADOWS } from '../../../theme/glassmorphism';
+import { MarkdownText } from '../../../components/shared/MarkdownText';
+import { ImageViewer } from '../../../components/shared/ImageViewer';
+import { useChatStore } from '../store/chatStore';
+import { Attachment, Message } from '../types';
 
 // Enable LayoutAnimation on Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
-import { Ionicons } from '@expo/vector-icons';
-import * as Clipboard from 'expo-clipboard';
-import * as Haptics from 'expo-haptics';
-import { Message, Attachment } from '../types';
-import { useChatStore } from '../store/chatStore';
 
 interface MessageBubbleProps {
   message: Message;
@@ -200,9 +200,10 @@ const ImageSkeleton = memo(() => {
 interface ImageAttachmentProps {
   attachment: Attachment;
   isGenerating?: boolean;
+  onPress?: () => void;
 }
 
-const ImageAttachment = memo<ImageAttachmentProps>(({ attachment, isGenerating }) => {
+const ImageAttachment = memo<ImageAttachmentProps>(({ attachment, isGenerating, onPress }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -227,7 +228,12 @@ const ImageAttachment = memo<ImageAttachmentProps>(({ attachment, isGenerating }
   }
 
   return (
-    <View style={styles.imageWrapper}>
+    <TouchableOpacity
+      style={styles.imageWrapper}
+      onPress={onPress}
+      activeOpacity={0.9}
+      disabled={hasError || isLoading}
+    >
       {isLoading && !hasError && <ImageSkeleton />}
       {hasError ? (
         <View style={styles.imageError}>
@@ -235,15 +241,21 @@ const ImageAttachment = memo<ImageAttachmentProps>(({ attachment, isGenerating }
           <Text style={styles.imageErrorText}>Failed to load image</Text>
         </View>
       ) : (
-        <Animated.Image
-          source={{ uri: attachment.uri }}
-          style={[styles.attachmentImage, { opacity: fadeAnim }]}
-          resizeMode="cover"
-          onLoad={handleLoad}
-          onError={handleError}
-        />
+        <>
+          <Animated.Image
+            source={{ uri: attachment.uri }}
+            style={[styles.attachmentImage, { opacity: fadeAnim }]}
+            resizeMode="cover"
+            onLoad={handleLoad}
+            onError={handleError}
+          />
+          {/* View indicator overlay */}
+          <View style={styles.imageOverlay}>
+            <Ionicons name="expand-outline" size={16} color="#FFFFFF" />
+          </View>
+        </>
       )}
-    </View>
+    </TouchableOpacity>
   );
 });
 
@@ -253,6 +265,7 @@ export const MessageBubble = memo<MessageBubbleProps>(({ message, isLast }) => {
   const slideAnim = useRef(new Animated.Value(isUser ? 20 : -20)).current;
   const glowAnim = useRef(new Animated.Value(0)).current;
   const prevContentLength = useRef(message.content?.length || 0);
+  const [viewingImage, setViewingImage] = useState<Attachment | null>(null);
   
   const { settings, speakMessage, voiceState, stopSpeaking, elevenLabsClient } = useChatStore();
 
@@ -331,14 +344,22 @@ export const MessageBubble = memo<MessageBubbleProps>(({ message, isLast }) => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
 
+    // If already speaking, stop it
     if (voiceState.isSpeaking) {
       await stopSpeaking();
-    } else {
-      try {
-        await speakMessage(message.content);
-      } catch (error) {
-        console.error('Failed to speak:', error);
-      }
+      return;
+    }
+
+    // speakMessage will automatically stop any existing playback before starting new one
+    try {
+      await speakMessage(message.content);
+    } catch (error: any) {
+      console.error('Failed to speak:', error);
+      // Show error in chat store for toast display
+      const { setError } = useChatStore.getState();
+      const { parseElevenLabsError } = require('../../../utils/errorUtils');
+      const errorInfo = parseElevenLabsError(error);
+      setError(errorInfo.message);
     }
   };
 
@@ -353,14 +374,18 @@ export const MessageBubble = memo<MessageBubbleProps>(({ message, isLast }) => {
         },
       ]}
     >
-      {/* Avatar */}
-      <View style={[styles.avatar, isUser ? styles.userAvatar : styles.assistantAvatar]}>
-        <Ionicons
-          name={isUser ? 'person' : 'sparkles'}
-          size={16}
-          color={isUser ? '#10A37F' : '#9B8AFF'}
-        />
-      </View>
+      {/* For Assistant: Only show icon while streaming */}
+      {!isUser && message.isStreaming && (
+        <View style={styles.assistantAvatarContainer}>
+          <View style={[styles.avatar, styles.assistantAvatar]}>
+            <Ionicons
+              name="sparkles"
+              size={16}
+              color="#9B8AFF"
+            />
+          </View>
+        </View>
+      )}
 
       {/* Message Content */}
       <Animated.View 
@@ -370,83 +395,114 @@ export const MessageBubble = memo<MessageBubbleProps>(({ message, isLast }) => {
           !isUser && message.isStreaming && { backgroundColor: bubbleGlow },
         ]}
       >
-        {/* Image Generation Skeleton - show when generating */}
-        {message.isStreaming && message.content?.includes('Generating image') && (
-          <View style={styles.attachmentsContainer}>
-            <ImageSkeleton />
-          </View>
+        {Platform.OS !== 'web' && (
+          <BlurView
+            intensity={20}
+            tint="dark"
+            style={StyleSheet.absoluteFill}
+          />
         )}
+        <View style={styles.bubbleContent}>
+          {/* Image Generation Skeleton - show when generating */}
+          {message.isStreaming && message.content?.includes('Generating image') && (
+            <View style={styles.attachmentsContainer}>
+              <ImageSkeleton />
+            </View>
+          )}
 
-        {/* Attachments */}
-        {message.attachments && message.attachments.length > 0 && (
-          <View style={styles.attachmentsContainer}>
-            {message.attachments.map((attachment) => (
-              attachment.type === 'image' ? (
-                <ImageAttachment
-                  key={attachment.id}
-                  attachment={attachment}
-                  isGenerating={false}
-                />
-              ) : (
-                <View key={attachment.id} style={styles.attachmentFile}>
-                  <Ionicons name="document" size={20} color="#8E8EA0" />
-                  <Text style={styles.attachmentFileName} numberOfLines={1}>
-                    {attachment.name}
-                  </Text>
-                </View>
-              )
-            ))}
-          </View>
-        )}
+          {/* Attachments */}
+          {message.attachments && message.attachments.length > 0 && (
+            <View style={styles.attachmentsContainer}>
+              {message.attachments.map((attachment) => (
+                attachment.type === 'image' ? (
+                  <ImageAttachment
+                    key={attachment.id}
+                    attachment={attachment}
+                    isGenerating={false}
+                    onPress={() => setViewingImage(attachment)}
+                  />
+                ) : (
+                  <View key={attachment.id} style={styles.attachmentFile}>
+                    <Ionicons name="document" size={20} color="#8E8EA0" />
+                    <Text style={styles.attachmentFileName} numberOfLines={1}>
+                      {attachment.name}
+                    </Text>
+                  </View>
+                )
+              ))}
+            </View>
+          )}
 
-        {message.isStreaming && !message.content ? (
-          <TypingDots />
-        ) : (
-          <View style={styles.messageContent}>
-            {message.content ? (
-              <Text style={[styles.messageText, isUser && styles.userMessageText]}>
-                {message.content}
-              </Text>
-            ) : null}
-            {message.isStreaming && <StreamingCursor />}
-          </View>
-        )}
+          {message.isStreaming && !message.content ? (
+            <TypingDots />
+          ) : (
+            <View style={styles.messageContent}>
+              {message.content ? (
+                <>
+                  <MarkdownText 
+                    content={message.content} 
+                    isUser={isUser}
+                    isStreaming={message.isStreaming}
+                  />
+                  {message.isStreaming && <StreamingCursor />}
+                </>
+              ) : null}
+            </View>
+          )}
 
-        {/* Actions - only for assistant messages and not streaming */}
-        {!isUser && !message.isStreaming && message.content && (
-          <View style={styles.actions}>
-            <TouchableOpacity onPress={handleCopy} style={styles.actionButton}>
-              <Ionicons name="copy-outline" size={16} color="#8E8EA0" />
-            </TouchableOpacity>
-            
-            {elevenLabsClient && (
-              <TouchableOpacity onPress={handleSpeak} style={styles.actionButton}>
-                <Ionicons 
-                  name={voiceState.isSpeaking ? 'stop-circle' : 'volume-high-outline'} 
-                  size={16} 
-                  color="#8E8EA0" 
-                />
+          {/* Actions - only for assistant messages and not streaming */}
+          {!isUser && !message.isStreaming && message.content && (
+            <View style={styles.actions}>
+              <TouchableOpacity onPress={handleCopy} style={styles.actionButton}>
+                <Ionicons name="copy-outline" size={16} color="#8E8EA0" />
               </TouchableOpacity>
-            )}
-          </View>
-        )}
+              
+              {elevenLabsClient && (
+                <TouchableOpacity onPress={handleSpeak} style={styles.actionButton}>
+                  <Ionicons 
+                    name={voiceState.isSpeaking ? 'stop-circle' : 'volume-high-outline'} 
+                    size={16} 
+                    color="#8E8EA0" 
+                  />
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+        </View>
       </Animated.View>
+
+      {/* Image Viewer Modal */}
+      {viewingImage && (
+        <ImageViewer
+          visible={!!viewingImage}
+          imageUri={viewingImage.uri}
+          imageName={viewingImage.name}
+          onClose={() => setViewingImage(null)}
+        />
+      )}
     </Animated.View>
   );
 });
 
 const styles = StyleSheet.create({
   container: {
-    flexDirection: 'row',
     marginVertical: 8,
     paddingHorizontal: 16,
     maxWidth: '100%',
   },
   userContainer: {
+    flexDirection: 'row',
     justifyContent: 'flex-end',
+    alignItems: 'flex-end',
   },
   assistantContainer: {
-    justifyContent: 'flex-start',
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    width: '100%',
+  },
+  assistantAvatarContainer: {
+    marginBottom: 6,
+    marginLeft: 4,
   },
   avatar: {
     width: 32,
@@ -454,23 +510,29 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 4,
   },
   userAvatar: {
-    backgroundColor: 'rgba(16, 163, 127, 0.15)',
-    marginLeft: 8,
-    order: 1,
-  },
-  assistantAvatar: {
-    backgroundColor: 'rgba(155, 138, 255, 0.15)',
+    backgroundColor: GLASS_COLORS.accent.green.medium,
+    borderWidth: 1,
+    borderColor: GLASS_COLORS.accent.green.border.light,
     marginRight: 8,
   },
+  assistantAvatar: {
+    backgroundColor: GLASS_COLORS.purple.medium,
+    borderWidth: 1,
+    borderColor: GLASS_COLORS.purple.border.light,
+  },
   bubble: {
-    maxWidth: '80%',
-    borderRadius: 20,
+    borderRadius: 24,
     paddingHorizontal: 16,
     paddingVertical: 12,
     overflow: 'hidden',
+    borderWidth: 1,
+    ...GLASS_SHADOWS.medium,
+  },
+  bubbleContent: {
+    position: 'relative',
+    zIndex: 1,
   },
   attachmentsContainer: {
     marginBottom: 8,
@@ -485,6 +547,20 @@ const styles = StyleSheet.create({
     height: 150,
     borderRadius: 12,
     overflow: 'hidden',
+    position: 'relative',
+  },
+  imageOverlay: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    borderRadius: 16,
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   attachmentImage: {
     width: 200,
@@ -530,7 +606,9 @@ const styles = StyleSheet.create({
   attachmentFile: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(142, 142, 160, 0.1)',
+    backgroundColor: GLASS_COLORS.neutral.medium,
+    borderWidth: 1,
+    borderColor: GLASS_COLORS.border.medium,
     padding: 10,
     borderRadius: 8,
   },
@@ -541,17 +619,23 @@ const styles = StyleSheet.create({
     maxWidth: 150,
   },
   userBubble: {
-    backgroundColor: '#10A37F',
-    borderBottomRightRadius: 4,
+    backgroundColor: GLASS_COLORS.accent.green.strong,
+    borderColor: GLASS_COLORS.accent.green.border.medium,
+    borderBottomRightRadius: 6,
+    maxWidth: '80%',
   },
   assistantBubble: {
-    backgroundColor: '#2D2D3A',
-    borderBottomLeftRadius: 4,
+    backgroundColor: GLASS_COLORS.secondary.light,
+    borderColor: GLASS_COLORS.border.medium,
+    borderBottomLeftRadius: 6,
+    width: '100%',
+    maxWidth: '100%',
   },
   messageContent: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     alignItems: 'flex-end',
+    gap: 4,
   },
   messageText: {
     fontSize: 15,
@@ -581,7 +665,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
     paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(142, 142, 160, 0.1)',
+    borderTopColor: GLASS_COLORS.border.light,
   },
   actionButton: {
     padding: 4,

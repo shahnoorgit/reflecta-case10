@@ -4,23 +4,24 @@
  */
 
 import { Ionicons } from '@expo/vector-icons';
-import Slider from '@react-native-community/slider';
+import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useCallback, useRef, useState } from 'react';
 import {
   Linking,
   Modal,
+  Platform,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { GLASS_COLORS, GLASS_SHADOWS } from '../../../theme/glassmorphism';
 import { useChatStore } from '../store/chatStore';
-import { AVAILABLE_MODELS, DEFAULT_VOICES } from '../types';
 
 interface SettingsScreenProps {
   visible: boolean;
@@ -29,6 +30,7 @@ interface SettingsScreenProps {
 
 export const SettingsScreen: React.FC<SettingsScreenProps> = ({ visible, onClose }) => {
   const { settings, updateSettings } = useChatStore();
+  const insets = useSafeAreaInsets();
   const [showOpenRouterKey, setShowOpenRouterKey] = useState(false);
   const [showOpenAiKey, setShowOpenAiKey] = useState(false);
   const [showElevenLabsKey, setShowElevenLabsKey] = useState(false);
@@ -68,13 +70,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ visible, onClose
     }
   }, [settings?.elevenLabsApiKey]);
 
-  const handleSettingChange = (key: string, value: any) => {
-    if (settings?.hapticFeedback) {
-      Haptics.selectionAsync();
-    }
-    updateSettings({ [key]: value });
-  };
-  
   // Debounced handlers for API keys
   const handleOpenRouterKeyChange = useCallback((text: string) => {
     setLocalOpenRouterKey(text);
@@ -127,10 +122,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ visible, onClose
     Linking.openURL(url);
   };
 
-  // Use optional chaining and fallbacks to prevent crashes
-  const selectedModel = AVAILABLE_MODELS.find(m => m.id === (settings?.selectedModel || '')) || AVAILABLE_MODELS[1];
-  const selectedVoice = DEFAULT_VOICES.find(v => v.voice_id === (settings?.selectedVoice || '')) || DEFAULT_VOICES[0];
-
   return (
     <Modal
       visible={visible}
@@ -140,21 +131,35 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ visible, onClose
     >
       <View style={styles.container}>
         <LinearGradient
-          colors={['#1A1A2E', '#0F0F1E']}
+          colors={['#1A1A2E', '#16162A', '#0F0F1E']}
           style={styles.gradient}
         >
+          {Platform.OS !== 'web' && (
+            <BlurView
+              intensity={30}
+              tint="dark"
+              style={StyleSheet.absoluteFill}
+            />
+          )}
+          
           {/* Header */}
-          <View style={styles.header}>
+          <View style={[styles.header, { position: 'relative', zIndex: 1, paddingTop: Math.max(insets.top, 16) }]}>
             <Text style={styles.headerTitle}>Settings</Text>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
               <Ionicons name="close" size={24} color="#ECECF1" />
             </TouchableOpacity>
           </View>
 
-          <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          <ScrollView 
+            style={[styles.content, { position: 'relative', zIndex: 1 }]} 
+            showsVerticalScrollIndicator={false}
+          >
             {/* API Keys Section */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>API Keys</Text>
+              <View style={styles.sectionHeader}>
+                <Ionicons name="key-outline" size={24} color="#9B8AFF" />
+                <Text style={styles.sectionTitle}>API Keys</Text>
+              </View>
               <Text style={styles.sectionDescription}>
                 Add your API keys to enable AI chat and voice features
               </Text>
@@ -162,11 +167,16 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ visible, onClose
               {/* OpenRouter API Key */}
               <View style={styles.inputGroup}>
                 <View style={styles.inputHeader}>
-                  <Text style={styles.inputLabel}>OpenRouter API Key</Text>
+                  <View style={styles.inputLabelContainer}>
+                    <Ionicons name="sparkles" size={18} color="#9B8AFF" />
+                    <Text style={styles.inputLabel}>OpenRouter API Key</Text>
+                  </View>
                   <TouchableOpacity
                     onPress={() => openLink('https://openrouter.ai/keys')}
+                    style={styles.linkButton}
                   >
-                    <Text style={styles.linkText}>Get Key →</Text>
+                    <Text style={styles.linkText}>Get Key</Text>
+                    <Ionicons name="open-outline" size={14} color="#10A37F" />
                   </TouchableOpacity>
                 </View>
                 <View style={styles.inputContainer}>
@@ -196,11 +206,16 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ visible, onClose
               {/* OpenAI API Key for Whisper */}
               <View style={styles.inputGroup}>
                 <View style={styles.inputHeader}>
-                  <Text style={styles.inputLabel}>OpenAI API Key (Voice Input)</Text>
+                  <View style={styles.inputLabelContainer}>
+                    <Ionicons name="mic-outline" size={18} color="#10A37F" />
+                    <Text style={styles.inputLabel}>OpenAI API Key</Text>
+                  </View>
                   <TouchableOpacity
                     onPress={() => openLink('https://platform.openai.com/api-keys')}
+                    style={styles.linkButton}
                   >
-                    <Text style={styles.linkText}>Get Key →</Text>
+                    <Text style={styles.linkText}>Get Key</Text>
+                    <Ionicons name="open-outline" size={14} color="#10A37F" />
                   </TouchableOpacity>
                 </View>
                 <View style={styles.inputContainer}>
@@ -231,11 +246,16 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ visible, onClose
               {/* ElevenLabs API Key */}
               <View style={styles.inputGroup}>
                 <View style={styles.inputHeader}>
-                  <Text style={styles.inputLabel}>ElevenLabs API Key (Voice Output)</Text>
+                  <View style={styles.inputLabelContainer}>
+                    <Ionicons name="volume-high-outline" size={18} color="#9B8AFF" />
+                    <Text style={styles.inputLabel}>ElevenLabs API Key</Text>
+                  </View>
                   <TouchableOpacity
                     onPress={() => openLink('https://elevenlabs.io/app/settings/api-keys')}
+                    style={styles.linkButton}
                   >
-                    <Text style={styles.linkText}>Get Key →</Text>
+                    <Text style={styles.linkText}>Get Key</Text>
+                    <Ionicons name="open-outline" size={14} color="#10A37F" />
                   </TouchableOpacity>
                 </View>
                 <View style={styles.inputContainer}>
@@ -260,146 +280,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ visible, onClose
                     />
                   </TouchableOpacity>
                 </View>
-              </View>
-            </View>
-
-            {/* Model Settings Section */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Model Settings</Text>
-
-              {/* Temperature */}
-              <View style={styles.sliderGroup}>
-                <View style={styles.sliderHeader}>
-                  <Text style={styles.inputLabel}>Temperature</Text>
-                  <Text style={styles.sliderValue}>{(settings?.temperature ?? 0.7).toFixed(1)}</Text>
-                </View>
-                <Text style={styles.sliderDescription}>
-                  Higher values make output more creative, lower values more focused
-                </Text>
-                <View style={styles.sliderContainer}>
-                  <Slider
-                    style={styles.slider}
-                    minimumValue={0}
-                    maximumValue={2}
-                    value={settings?.temperature ?? 0.7}
-                    onValueChange={(value) => handleSettingChange('temperature', value)}
-                    minimumTrackTintColor="#10A37F"
-                    maximumTrackTintColor="#3A3A4A"
-                    thumbTintColor="#10A37F"
-                  />
-                </View>
-              </View>
-
-              {/* Max Tokens */}
-              <View style={styles.sliderGroup}>
-                <View style={styles.sliderHeader}>
-                  <Text style={styles.inputLabel}>Max Tokens</Text>
-                  <Text style={styles.sliderValue}>{settings?.maxTokens ?? 4096}</Text>
-                </View>
-                <Text style={styles.sliderDescription}>
-                  Maximum length of the response
-                </Text>
-                <View style={styles.sliderContainer}>
-                  <Slider
-                    style={styles.slider}
-                    minimumValue={256}
-                    maximumValue={8192}
-                    step={256}
-                    value={settings?.maxTokens ?? 4096}
-                    onValueChange={(value) => handleSettingChange('maxTokens', value)}
-                    minimumTrackTintColor="#10A37F"
-                    maximumTrackTintColor="#3A3A4A"
-                    thumbTintColor="#10A37F"
-                  />
-                </View>
-              </View>
-            </View>
-
-            {/* Voice Settings Section */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Voice Settings</Text>
-
-              {/* Voice Selection */}
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Voice</Text>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  style={styles.voiceList}
-                >
-                  {DEFAULT_VOICES.map((voice) => (
-                    <TouchableOpacity
-                      key={voice.voice_id}
-                      style={[
-                        styles.voiceChip,
-                        voice.voice_id === (settings?.selectedVoice || '') && styles.voiceChipSelected,
-                      ]}
-                      onPress={() => handleSettingChange('selectedVoice', voice.voice_id)}
-                    >
-                      <Text
-                        style={[
-                          styles.voiceChipText,
-                          voice.voice_id === settings.selectedVoice && styles.voiceChipTextSelected,
-                        ]}
-                      >
-                        {voice.name}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-            </View>
-
-            {/* Preferences Section */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Preferences</Text>
-
-              {/* Haptic Feedback */}
-              <View style={styles.toggleRow}>
-                <View style={styles.toggleInfo}>
-                  <Ionicons name="phone-portrait-outline" size={20} color="#8E8EA0" />
-                  <Text style={styles.toggleLabel}>Haptic Feedback</Text>
-                </View>
-                <Switch
-                  value={settings?.hapticFeedback ?? true}
-                  onValueChange={(value) => handleSettingChange('hapticFeedback', value)}
-                  trackColor={{ false: '#3A3A4A', true: 'rgba(16, 163, 127, 0.5)' }}
-                  thumbColor={(settings?.hapticFeedback ?? true) ? '#10A37F' : '#8E8EA0'}
-                />
-              </View>
-
-              {/* Voice Enabled */}
-              <View style={styles.toggleRow}>
-                <View style={styles.toggleInfo}>
-                  <Ionicons name="volume-high-outline" size={20} color="#8E8EA0" />
-                  <Text style={styles.toggleLabel}>Voice Mode</Text>
-                </View>
-                <Switch
-                  value={settings?.voiceEnabled ?? true}
-                  onValueChange={(value) => handleSettingChange('voiceEnabled', value)}
-                  trackColor={{ false: '#3A3A4A', true: 'rgba(16, 163, 127, 0.5)' }}
-                  thumbColor={(settings?.voiceEnabled ?? true) ? '#10A37F' : '#8E8EA0'}
-                />
-              </View>
-            </View>
-
-            {/* About Section */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>About</Text>
-              <View style={styles.aboutCard}>
-                <LinearGradient
-                  colors={['rgba(155, 138, 255, 0.15)', 'rgba(107, 91, 255, 0.1)']}
-                  style={styles.aboutGradient}
-                >
-                  <View style={styles.aboutIcon}>
-                    <Ionicons name="sparkles" size={24} color="#9B8AFF" />
-                  </View>
-                  <Text style={styles.aboutTitle}>Reflecta Chat</Text>
-                  <Text style={styles.aboutDescription}>
-                    A ChatGPT-style app built with React Native, Expo, and OpenRouter
-                  </Text>
-                  <Text style={styles.aboutVersion}>Version 1.0.0</Text>
-                </LinearGradient>
+                <Text style={styles.inputHint}>Required for voice output (TTS)</Text>
               </View>
             </View>
 
@@ -419,16 +300,16 @@ const styles = StyleSheet.create({
   },
   gradient: {
     flex: 1,
+    overflow: 'hidden',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingTop: 60,
     paddingBottom: 20,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(142, 142, 160, 0.1)',
+    borderBottomColor: GLASS_COLORS.border.subtle,
   },
   headerTitle: {
     fontSize: 24,
@@ -439,9 +320,12 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: 'rgba(142, 142, 160, 0.1)',
+    backgroundColor: GLASS_COLORS.neutral.medium,
+    borderWidth: 1,
+    borderColor: GLASS_COLORS.border.medium,
     justifyContent: 'center',
     alignItems: 'center',
+    ...GLASS_SHADOWS.subtle,
   },
   content: {
     flex: 1,
@@ -450,16 +334,22 @@ const styles = StyleSheet.create({
   section: {
     marginTop: 28,
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 8,
+  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: '#ECECF1',
-    marginBottom: 8,
   },
   sectionDescription: {
     fontSize: 14,
     color: '#8E8EA0',
-    marginBottom: 16,
+    marginBottom: 20,
+    marginLeft: 34,
   },
   inputGroup: {
     marginBottom: 20,
@@ -468,144 +358,59 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: 12,
+  },
+  inputLabelContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   inputLabel: {
-    fontSize: 14,
-    fontWeight: '500',
+    fontSize: 15,
+    fontWeight: '600',
     color: '#ECECF1',
+  },
+  linkButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: GLASS_COLORS.accent.green.light,
+    borderWidth: 1,
+    borderColor: GLASS_COLORS.accent.green.border.light,
   },
   linkText: {
     fontSize: 13,
     color: '#10A37F',
-    fontWeight: '500',
+    fontWeight: '600',
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#2D2D3A',
-    borderRadius: 12,
+    backgroundColor: GLASS_COLORS.secondary.light,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(142, 142, 160, 0.1)',
+    borderColor: GLASS_COLORS.border.medium,
+    ...GLASS_SHADOWS.subtle,
   },
   inputHint: {
-    fontSize: 11,
-    color: '#5A5A6A',
-    marginTop: 6,
+    fontSize: 12,
+    color: '#8E8EA0',
+    marginTop: 8,
     marginLeft: 4,
+    fontStyle: 'italic',
   },
   input: {
     flex: 1,
-    height: 48,
+    height: 52,
     paddingHorizontal: 16,
     fontSize: 15,
     color: '#ECECF1',
   },
   eyeButton: {
     padding: 12,
-  },
-  sliderGroup: {
-    marginBottom: 24,
-  },
-  sliderHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 4,
-  },
-  sliderDescription: {
-    fontSize: 12,
-    color: '#5A5A6A',
-    marginBottom: 12,
-  },
-  sliderValue: {
-    fontSize: 14,
-    color: '#10A37F',
-    fontWeight: '600',
-  },
-  sliderContainer: {
-    height: 40,
-    justifyContent: 'center',
-  },
-  slider: {
-    width: '100%',
-    height: 40,
-  },
-  voiceList: {
-    marginTop: 12,
-  },
-  voiceChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    backgroundColor: '#2D2D3A',
-    marginRight: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(142, 142, 160, 0.1)',
-  },
-  voiceChipSelected: {
-    backgroundColor: 'rgba(16, 163, 127, 0.15)',
-    borderColor: '#10A37F',
-  },
-  voiceChipText: {
-    fontSize: 14,
-    color: '#8E8EA0',
-    fontWeight: '500',
-  },
-  voiceChipTextSelected: {
-    color: '#10A37F',
-  },
-  toggleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(142, 142, 160, 0.05)',
-  },
-  toggleInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  toggleLabel: {
-    fontSize: 15,
-    color: '#ECECF1',
-    marginLeft: 12,
-  },
-  aboutCard: {
-    borderRadius: 16,
-    overflow: 'hidden',
-    marginTop: 8,
-  },
-  aboutGradient: {
-    padding: 20,
-    alignItems: 'center',
-  },
-  aboutIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    backgroundColor: 'rgba(155, 138, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  aboutTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#ECECF1',
-    marginBottom: 8,
-  },
-  aboutDescription: {
-    fontSize: 14,
-    color: '#8E8EA0',
-    textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: 12,
-  },
-  aboutVersion: {
-    fontSize: 12,
-    color: '#5A5A6A',
   },
 });
 

@@ -106,27 +106,40 @@ export const syncConversationToCloud = async (
 };
 
 /**
- * Fetch all conversations from Supabase for a user
+ * Fetch conversations from Supabase for a user with pagination
  */
 export const fetchConversationsFromCloud = async (
-  userId: string
-): Promise<Conversation[]> => {
-  if (!isSupabaseConfigured() || !userId) return [];
+  userId: string,
+  limit: number = 20,
+  offset: number = 0
+): Promise<{ conversations: Conversation[]; hasMore: boolean }> => {
+  if (!isSupabaseConfigured() || !userId) return { conversations: [], hasMore: false };
 
   try {
-    console.log('Fetching conversations...');
+    console.log(`Fetching conversations (limit: ${limit}, offset: ${offset})...`);
 
+    // Fetch one extra to check if there are more
     const { data: conversations, error: convError } = await supabase
       .from('conversations')
       .select('*')
       .eq('user_id', userId)  // Filter by user ID
-      .order('updated_at', { ascending: false });
+      .order('updated_at', { ascending: false })
+      .range(offset, offset + limit); // Fetch limit + 1 to check hasMore
 
     if (convError) throw convError;
-    if (!conversations) return [];
+    if (!conversations) return { conversations: [], hasMore: false };
+
+    // Check if there are more conversations
+    const hasMore = conversations.length > limit;
+    // If we fetched one extra, remove it
+    const actualConversations = hasMore ? conversations.slice(0, limit) : conversations;
 
     // Fetch all messages for these conversations
-    const conversationIds = conversations.map((c) => c.id);
+    const conversationIds = actualConversations.map((c) => c.id);
+    if (conversationIds.length === 0) {
+      return { conversations: [], hasMore: false };
+    }
+
     const { data: messages, error: msgError } = await supabase
       .from('messages')
       .select('*')
@@ -150,10 +163,10 @@ export const fetchConversationsFromCloud = async (
       }
     }
 
-    console.log('✓ Fetched', conversations.length, 'conversations from cloud');
+    console.log(`✓ Fetched ${actualConversations.length} conversations from cloud (hasMore: ${hasMore})`);
 
     // Map to app format
-    return conversations.map((conv: SupabaseConversation) => {
+    const mappedConversations = actualConversations.map((conv: SupabaseConversation) => {
       const convMessages = (messages || [])
         .filter((m: SupabaseMessage) => m.conversation_id === conv.id)
         .map((m: SupabaseMessage): Message => {
@@ -188,9 +201,11 @@ export const fetchConversationsFromCloud = async (
         userId: conv.user_id, // Ensure userId is set from cloud data
       } as Conversation;
     });
+
+    return { conversations: mappedConversations, hasMore };
   } catch (error) {
     console.error('Error fetching conversations:', error);
-    return [];
+    return { conversations: [], hasMore: false };
   }
 };
 

@@ -16,6 +16,11 @@ import {
   syncConversationToCloud
 } from '../../../services/chatSyncService';
 import {
+  fetchSettingsFromCloud,
+  mergeSettings,
+  saveSettingsToCloud
+} from '../../../services/settingsSyncService';
+import {
   extractImagePrompt,
   generateImage,
   isImageGenerationRequest,
@@ -37,6 +42,8 @@ interface ChatState {
   // Sync state
   isSyncing: boolean;
   lastSyncAt: number | null;
+  conversationsHasMore: boolean;
+  conversationsOffset: number;
   
   // Settings
   settings: ChatSettings;
@@ -57,7 +64,7 @@ interface ChatState {
   activeRequestCleanup: (() => void) | null;
   
   // Actions - User
-  setUserId: (userId: string | null) => void;
+  setUserId: (userId: string | null) => Promise<void>;
   
   // Actions - Conversations
   createConversation: () => string;
@@ -68,11 +75,13 @@ interface ChatState {
   // Actions - Messages
   addMessage: (message: Omit<Message, 'id' | 'timestamp'>) => void;
   updateMessage: (id: string, content: string, isStreaming?: boolean) => void;
+  updateMessageAttachments: (messageId: string, attachments: Attachment[]) => void;
   sendMessage: (content: string, attachments?: Attachment[]) => Promise<void>;
   
   // Actions - Sync
   syncWithCloud: () => Promise<void>;
   syncConversation: (conversationId: string) => Promise<void>;
+  fetchMoreConversations: () => Promise<void>;
   
   // Actions - Settings
   updateSettings: (settings: Partial<ChatSettings>) => void;
@@ -121,6 +130,8 @@ export const useChatStore = create<ChatState>()(
       activeConversationId: null,
       isSyncing: false,
       lastSyncAt: null,
+      conversationsHasMore: true,
+      conversationsOffset: 0,
       settings: DEFAULT_SETTINGS,
       voiceState: DEFAULT_VOICE_STATE,
       isLoading: false,
@@ -131,7 +142,7 @@ export const useChatStore = create<ChatState>()(
       activeRequestCleanup: null,
 
       // Set user ID (called when user logs in)
-      setUserId: (userId: string | null) => {
+      setUserId: async (userId: string | null) => {
         const currentUserId = get().userId;
         
         // If user changed (logout or different user), clear conversations
@@ -142,6 +153,8 @@ export const useChatStore = create<ChatState>()(
             conversations: [],
             activeConversationId: null,
             lastSyncAt: null,
+            conversationsHasMore: true,
+            conversationsOffset: 0,
           });
         } else {
           set({ userId });
@@ -150,7 +163,19 @@ export const useChatStore = create<ChatState>()(
         // Sync with cloud when user logs in
         if (userId) {
           console.log('User logged in, syncing:', userId);
-          // Small delay to ensure session is stored
+          
+          // Load settings from cloud and merge with local
+          const cloudSettings = await fetchSettingsFromCloud(userId);
+          if (cloudSettings) {
+            const currentSettings = get().settings;
+            const mergedSettings = mergeSettings(currentSettings, cloudSettings);
+            set({ settings: mergedSettings });
+            
+            // Update API clients with merged settings
+            get().updateSettings({});
+          }
+          
+          // Small delay to ensure session is stored, then sync conversations
           setTimeout(() => get().syncWithCloud(), 500);
         }
       },
@@ -167,15 +192,15 @@ export const useChatStore = create<ChatState>()(
         });
       },
 
-      // Sync all conversations with Supabase
+      // Sync all conversations with Supabase (initial load - first 20)
       syncWithCloud: async () => {
         const { userId, conversations, isSyncing } = get();
         if (!userId || isSyncing) return;
 
-        set({ isSyncing: true });
+        set({ isSyncing: true, conversationsOffset: 0 });
         try {
-          // Fetch conversations from cloud
-          const cloudConversations = await fetchConversationsFromCloud(userId);
+          // Fetch first 20 conversations from cloud
+          const { conversations: cloudConversations, hasMore } = await fetchConversationsFromCloud(userId, 20, 0);
           
           // Merge with local conversations (newer wins, filtered by userId)
           const merged = mergeConversations(conversations, cloudConversations, userId);
@@ -184,6 +209,8 @@ export const useChatStore = create<ChatState>()(
           set({ 
             conversations: merged,
             lastSyncAt: Date.now(),
+            conversationsHasMore: hasMore,
+            conversationsOffset: cloudConversations.length,
           });
 
           // Sync any local-only conversations to cloud
@@ -201,6 +228,43 @@ export const useChatStore = create<ChatState>()(
           }
         } catch (error) {
           console.error('Sync failed:', error);
+        } finally {
+          set({ isSyncing: false });
+        }
+      },
+
+      // Fetch more conversations (pagination)
+      fetchMoreConversations: async () => {
+        const { userId, conversations, conversationsHasMore, conversationsOffset, isSyncing } = get();
+        if (!userId || !conversationsHasMore || isSyncing) return;
+
+        set({ isSyncing: true });
+        try {
+          // Fetch next batch of conversations
+          const { conversations: newConversations, hasMore } = await fetchConversationsFromCloud(
+            userId,
+            20,
+            conversationsOffset
+          );
+
+          if (newConversations.length > 0) {
+            // Merge new conversations with existing (avoid duplicates)
+            const existingIds = new Set(conversations.map(c => c.id));
+            const uniqueNew = newConversations.filter(c => !existingIds.has(c.id));
+            
+            // Merge with local conversations (newer wins)
+            const merged = mergeConversations(conversations, uniqueNew, userId);
+            
+            set({
+              conversations: merged,
+              conversationsHasMore: hasMore,
+              conversationsOffset: conversationsOffset + newConversations.length,
+            });
+          } else {
+            set({ conversationsHasMore: false });
+          }
+        } catch (error) {
+          console.error('Failed to fetch more conversations:', error);
         } finally {
           set({ isSyncing: false });
         }
@@ -332,6 +396,25 @@ export const useChatStore = create<ChatState>()(
         }));
       },
 
+      updateMessageAttachments: (messageId: string, attachments: Attachment[]) => {
+        const { activeConversationId } = get();
+        if (!activeConversationId) return;
+
+        set((state) => ({
+          conversations: state.conversations.map((c) =>
+            c.id === activeConversationId
+              ? {
+                  ...c,
+                  messages: c.messages.map((m) =>
+                    m.id === messageId ? { ...m, attachments } : m
+                  ),
+                  updatedAt: Date.now(),
+                }
+              : c
+          ),
+        }));
+      },
+
       sendMessage: async (content: string, attachments?: Attachment[]) => {
         // Get fresh client reference at the start
         const { 
@@ -362,28 +445,17 @@ export const useChatStore = create<ChatState>()(
         // Generate message ID for attachments
         const userMessageId = generateId();
 
-        // Upload attachments to Supabase Storage (if user is logged in)
-        let uploadedAttachments = attachments;
-        if (attachments?.length && userId) {
-          try {
-            uploadedAttachments = await uploadAttachments(attachments, userId, userMessageId);
-            console.log('✓ Uploaded', uploadedAttachments.length, 'attachments');
-          } catch (error) {
-            console.error('Failed to upload attachments:', error);
-            // Continue with local attachments if upload fails
-          }
-        }
-
-        // Build user message with attachments
+        // OPTIMISTIC UPDATE: Add user message immediately with local attachments
+        // This shows the image/text immediately when user clicks send
         const userMessage: Message = {
           id: userMessageId,
           role: 'user',
           content,
           timestamp: Date.now(),
-          attachments: uploadedAttachments?.length ? uploadedAttachments : undefined,
+          attachments: attachments?.length ? attachments : undefined,
         };
 
-        // Add user message directly (with pre-generated ID)
+        // Add user message immediately (optimistic update)
         set((state) => ({
           conversations: state.conversations.map((c) =>
             c.id === conversationId
@@ -391,6 +463,23 @@ export const useChatStore = create<ChatState>()(
               : c
           ),
         }));
+
+        // Upload attachments in background (if user is logged in)
+        // Update message with cloud URLs when upload completes
+        if (attachments?.length && userId) {
+          uploadAttachments(attachments, userId, userMessageId)
+            .then((uploadedAttachments) => {
+              if (uploadedAttachments && uploadedAttachments.length > 0) {
+                console.log('✓ Uploaded', uploadedAttachments.length, 'attachments');
+                // Update message with cloud URLs
+                get().updateMessageAttachments(userMessageId, uploadedAttachments);
+              }
+            })
+            .catch((error) => {
+              console.error('Failed to upload attachments:', error);
+              // Keep local attachments on failure - message already shown
+            });
+        }
 
         // Create placeholder for assistant response
         const assistantMessageId = generateId();
@@ -491,23 +580,83 @@ export const useChatStore = create<ChatState>()(
           if (!conversation) return;
 
           // Build messages for API (with multimodal support)
-          const apiMessages = conversation.messages
-            .filter(m => m.id !== assistantMessageId)
-            .map(m => ({
-              role: m.role,
-              content: buildMessageContent(m.content, m.attachments),
-            }));
+          // CRITICAL FIX: Only include messages that have been successfully processed
+          // Filter out any orphaned user messages (user messages without a following assistant response)
+          // This prevents failed messages from being resent and causing 400 errors
+          const validMessages: Message[] = [];
+          
+          // Process messages in order, tracking which user messages have responses
+          for (let i = 0; i < conversation.messages.length; i++) {
+            const msg = conversation.messages[i];
+            
+            // Skip the current assistant placeholder
+            if (msg.id === assistantMessageId) continue;
+            
+            if (msg.role === 'user') {
+              // Check if this user message has a completed assistant response after it
+              let hasCompletedResponse = false;
+              
+              // Look ahead for a completed assistant response
+              for (let j = i + 1; j < conversation.messages.length; j++) {
+                const nextMsg = conversation.messages[j];
+                
+                // If we hit the current placeholder, this user message will get a response
+                if (nextMsg.id === assistantMessageId) {
+                  hasCompletedResponse = true;
+                  break;
+                }
+                
+                // If we find a completed assistant message, this user message is valid
+                if (nextMsg.role === 'assistant' && !nextMsg.isStreaming && nextMsg.content) {
+                  hasCompletedResponse = true;
+                  break;
+                }
+                
+                // If we hit another user message, this one is orphaned (no response)
+                if (nextMsg.role === 'user') {
+                  break;
+                }
+              }
+              
+              // Only include user messages that have or will have a response
+              if (hasCompletedResponse) {
+                validMessages.push(msg);
+              }
+            } else if (msg.role === 'assistant') {
+              // Only include completed assistant messages (not streaming, has content)
+              if (!msg.isStreaming && msg.content && msg.content.trim().length > 0) {
+                validMessages.push(msg);
+              }
+            } else {
+              // Include system messages
+              validMessages.push(msg);
+            }
+          }
+          
+          // Note: userMessage is already in conversation.messages and will be included
+          // in validMessages if it has a response (which it will, since we're about to get one)
+          
+          // Build API messages from valid messages only
+          const apiMessages = validMessages.map(m => ({
+            role: m.role,
+            content: buildMessageContent(m.content, m.attachments),
+          }));
 
           // Stream response with real-time updates!
           // Get fresh client reference right before making the request
           const currentClient = get().openRouterClient;
           if (!currentClient) {
             setError('OpenRouter API key was removed during message send');
-            // Remove the failed assistant message
+            // Remove both the failed user message and assistant message
             set((state) => ({
               conversations: state.conversations.map((c) =>
                 c.id === conversationId
-                  ? { ...c, messages: c.messages.filter(m => m.id !== assistantMessageId) }
+                  ? { 
+                      ...c, 
+                      messages: c.messages.filter(m => 
+                        m.id !== assistantMessageId && m.id !== userMessageId
+                      )
+                    }
                   : c
               ),
             }));
@@ -582,11 +731,16 @@ export const useChatStore = create<ChatState>()(
           setError(error.message || 'Failed to send message');
           // Clear cleanup function on error
           set({ activeRequestCleanup: null });
-          // Remove the failed assistant message
+          // Remove both the failed user message and assistant message to prevent message stacking
           set((state) => ({
             conversations: state.conversations.map((c) =>
               c.id === conversationId
-                ? { ...c, messages: c.messages.filter(m => m.id !== assistantMessageId) }
+                ? { 
+                    ...c, 
+                    messages: c.messages.filter(m => 
+                      m.id !== assistantMessageId && m.id !== userMessageId
+                    )
+                  }
                 : c
             ),
           }));
@@ -596,7 +750,9 @@ export const useChatStore = create<ChatState>()(
       },
 
       // Settings actions
-      updateSettings: (newSettings: Partial<ChatSettings>) => {
+      updateSettings: async (newSettings: Partial<ChatSettings>) => {
+        const userId = get().userId;
+        
         set((state) => {
           const updatedSettings = { ...state.settings, ...newSettings };
           
@@ -672,6 +828,15 @@ export const useChatStore = create<ChatState>()(
             activeRequestCleanup,
           };
         });
+        
+        // Save settings to cloud if user is logged in
+        if (userId && Object.keys(newSettings).length > 0) {
+          // Debounce cloud save to avoid too many writes
+          setTimeout(async () => {
+            const currentSettings = get().settings;
+            await saveSettingsToCloud(userId, currentSettings);
+          }, 1000);
+        }
       },
 
       // Voice actions
@@ -682,7 +847,10 @@ export const useChatStore = create<ChatState>()(
       },
 
       speakMessage: async (text: string) => {
-        const { elevenLabsClient, settings, setVoiceState } = get();
+        const { elevenLabsClient, settings, setVoiceState, stopSpeaking } = get();
+        
+        // Always stop any currently playing audio first
+        await stopSpeaking();
         
         // Check if API key exists in settings
         if (!settings.elevenLabsApiKey) {
@@ -701,6 +869,9 @@ export const useChatStore = create<ChatState>()(
         if (!client) {
           throw new Error('Failed to initialize ElevenLabs client');
         }
+
+        // Ensure we stop any existing playback before starting new one
+        await client.stop();
 
         await client.speak(
           text,

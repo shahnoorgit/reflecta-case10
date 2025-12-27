@@ -4,6 +4,7 @@
  */
 
 import { Ionicons } from '@expo/vector-icons';
+import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -13,6 +14,7 @@ import {
   Animated,
   Image,
   Keyboard,
+  Modal,
   Platform,
   ScrollView,
   StyleSheet,
@@ -22,8 +24,9 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { GLASS_COLORS, GLASS_SHADOWS } from '../../../theme/glassmorphism';
 import { useChatStore } from '../store/chatStore';
-import { Attachment } from '../types';
+import { Attachment, AVAILABLE_MODELS } from '../types';
 
 interface ChatInputProps {
   onVoiceModePress?: () => void;
@@ -34,11 +37,22 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onVoiceModePress }) => {
   const [inputHeight, setInputHeight] = useState(44);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [showAttachMenu, setShowAttachMenu] = useState(false);
+  const [showModelPicker, setShowModelPicker] = useState(false);
   
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const insets = useSafeAreaInsets();
   
-  const { sendMessage, isLoading, settings } = useChatStore();
+  const { sendMessage, isLoading, settings, updateSettings } = useChatStore();
+  
+  const selectedModel = AVAILABLE_MODELS.find(m => m.id === settings.selectedModel);
+  
+  const handleModelSelect = (modelId: string) => {
+    if (settings.hapticFeedback) {
+      Haptics.selectionAsync();
+    }
+    updateSettings({ selectedModel: modelId });
+    setShowModelPicker(false);
+  };
 
   // Generate unique ID
   const generateId = () => Math.random().toString(36).substring(2, 15);
@@ -158,30 +172,53 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onVoiceModePress }) => {
   const hasContent = hasText || attachments.length > 0;
 
   return (
-    <View style={[styles.container, { paddingBottom: Math.max(insets.bottom, 8) }]}>
-      {/* Attachment Previews */}
-      {attachments.length > 0 && (
-        <ScrollView 
-          horizontal 
-          showsHorizontalScrollIndicator={false}
-          style={styles.attachmentPreview}
-          contentContainerStyle={styles.attachmentPreviewContent}
-        >
-          {attachments.map((attachment) => (
-            <View key={attachment.id} style={styles.attachmentItem}>
-              <Image source={{ uri: attachment.uri }} style={styles.attachmentImage} />
-              <TouchableOpacity
-                style={styles.removeAttachment}
-                onPress={() => removeAttachment(attachment.id)}
-              >
-                <Ionicons name="close-circle" size={20} color="#FF6B6B" />
-              </TouchableOpacity>
-            </View>
-          ))}
-        </ScrollView>
-      )}
+    <>
+      <View style={[styles.container, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+        <View style={styles.floatingInputContainer}>
+          {Platform.OS !== 'web' && (
+            <BlurView
+              intensity={30}
+              tint="dark"
+              style={StyleSheet.absoluteFill}
+            />
+          )}
+          <View style={styles.containerContent}>
+          {/* Model Selector - Above input field */}
+          <TouchableOpacity
+            style={styles.modelSelector}
+            onPress={() => setShowModelPicker(true)}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="sparkles" size={14} color="#9B8AFF" />
+            <Text style={styles.modelSelectorText} numberOfLines={1}>
+              {selectedModel?.name || 'Select Model'}
+            </Text>
+            <Ionicons name="chevron-down" size={14} color="#8E8EA0" />
+          </TouchableOpacity>
 
-      <View style={styles.inputWrapper}>
+          {/* Attachment Previews */}
+          {attachments.length > 0 && (
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false}
+              style={styles.attachmentPreview}
+              contentContainerStyle={styles.attachmentPreviewContent}
+            >
+              {attachments.map((attachment) => (
+                <View key={attachment.id} style={styles.attachmentItem}>
+                  <Image source={{ uri: attachment.uri }} style={styles.attachmentImage} />
+                  <TouchableOpacity
+                    style={styles.removeAttachment}
+                    onPress={() => removeAttachment(attachment.id)}
+                  >
+                    <Ionicons name="close-circle" size={20} color="#FF6B6B" />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </ScrollView>
+          )}
+
+          <View style={styles.inputWrapper}>
         {/* Text Input */}
         <TextInput
           style={[
@@ -249,39 +286,205 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onVoiceModePress }) => {
               </TouchableOpacity>
             </Animated.View>
           )}
+          </View>
+          </View>
+
+          {/* Attachment Menu */}
+          {showAttachMenu && (
+            <View style={styles.attachMenu}>
+              <TouchableOpacity style={styles.attachMenuItem} onPress={takePhoto}>
+                <View style={[styles.attachMenuIcon, { backgroundColor: GLASS_COLORS.accent.green.medium }]}>
+                  <Ionicons name="camera-outline" size={24} color="#10A37F" />
+                </View>
+                <Text style={styles.attachMenuText}>Camera</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity style={styles.attachMenuItem} onPress={pickImage}>
+                <View style={[styles.attachMenuIcon, { backgroundColor: GLASS_COLORS.purple.medium }]}>
+                  <Ionicons name="image-outline" size={24} color="#9B8AFF" />
+                </View>
+                <Text style={styles.attachMenuText}>Gallery</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+          </View>
         </View>
       </View>
 
-      {/* Attachment Menu */}
-      {showAttachMenu && (
-        <View style={styles.attachMenu}>
-          <TouchableOpacity style={styles.attachMenuItem} onPress={takePhoto}>
-            <View style={[styles.attachMenuIcon, { backgroundColor: 'rgba(16, 163, 127, 0.2)' }]}>
-              <Ionicons name="camera-outline" size={24} color="#10A37F" />
+      {/* Model Picker Modal */}
+      <Modal
+        visible={showModelPicker}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowModelPicker(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalBackdrop}
+          activeOpacity={1}
+          onPress={() => setShowModelPicker(false)}
+        >
+          <View style={styles.modelPickerContainer}>
+            <View style={styles.modelPickerHeader}>
+              <Text style={styles.modelPickerTitle}>Select Model</Text>
+              <TouchableOpacity
+                onPress={() => setShowModelPicker(false)}
+                style={styles.modalCloseButton}
+              >
+                <Ionicons name="close" size={24} color="#8E8EA0" />
+              </TouchableOpacity>
             </View>
-            <Text style={styles.attachMenuText}>Camera</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.attachMenuItem} onPress={pickImage}>
-            <View style={[styles.attachMenuIcon, { backgroundColor: 'rgba(155, 138, 255, 0.2)' }]}>
-              <Ionicons name="image-outline" size={24} color="#9B8AFF" />
-            </View>
-            <Text style={styles.attachMenuText}>Gallery</Text>
-          </TouchableOpacity>
-        </View>
-      )}
 
-    </View>
+            <ScrollView style={styles.modelList}>
+              {AVAILABLE_MODELS.map((model) => (
+                <TouchableOpacity
+                  key={model.id}
+                  style={[
+                    styles.modelItem,
+                    model.id === settings.selectedModel && styles.modelItemSelected,
+                  ]}
+                  onPress={() => handleModelSelect(model.id)}
+                >
+                  <View style={styles.modelInfo}>
+                    <View style={styles.modelNameRow}>
+                      <Text style={styles.modelItemName}>{model.name}</Text>
+                      <Text style={styles.modelProvider}>{model.provider}</Text>
+                    </View>
+                    <Text style={styles.modelDescription}>{model.description}</Text>
+                  </View>
+                  
+                  {model.id === settings.selectedModel && (
+                    <Ionicons name="checkmark-circle" size={24} color="#10A37F" />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+    </>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 8,
+    paddingTop: 4,
+    backgroundColor: 'transparent',
+  },
+  floatingInputContainer: {
+    marginHorizontal: 4,
+    borderRadius: 28,
+    backgroundColor: GLASS_COLORS.background.light,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 163, 127, 0.25)',
+    overflow: 'hidden',
+    ...GLASS_SHADOWS.medium,
+  },
+  containerContent: {
+    position: 'relative',
+    zIndex: 1,
+    paddingHorizontal: 12,
     paddingTop: 12,
-    backgroundColor: '#1A1A2E',
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(142, 142, 160, 0.1)',
+    paddingBottom: 8,
+  },
+  modelSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: GLASS_COLORS.purple.light,
+    borderWidth: 1,
+    borderColor: GLASS_COLORS.purple.border.light,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+    marginBottom: 8,
+    gap: 6,
+    ...GLASS_SHADOWS.subtle,
+  },
+  modelSelectorText: {
+    color: '#ECECF1',
+    fontSize: 13,
+    fontWeight: '600',
+    maxWidth: 120,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: GLASS_COLORS.backdrop.medium,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modelPickerContainer: {
+    width: '100%',
+    maxWidth: 400,
+    backgroundColor: GLASS_COLORS.background.medium,
+    borderWidth: 1,
+    borderColor: GLASS_COLORS.border.medium,
+    borderRadius: 20,
+    maxHeight: '70%',
+    overflow: 'hidden',
+    ...GLASS_SHADOWS.heavy,
+  },
+  modelPickerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: GLASS_COLORS.border.subtle,
+  },
+  modelPickerTitle: {
+    color: '#ECECF1',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  modalCloseButton: {
+    padding: 4,
+  },
+  modelList: {
+    padding: 12,
+  },
+  modelItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 8,
+    backgroundColor: GLASS_COLORS.neutral.medium,
+    borderWidth: 1,
+    borderColor: GLASS_COLORS.border.light,
+  },
+  modelItemSelected: {
+    backgroundColor: GLASS_COLORS.accent.green.light,
+    borderWidth: 1,
+    borderColor: GLASS_COLORS.accent.green.border.medium,
+  },
+  modelInfo: {
+    flex: 1,
+    marginRight: 12,
+  },
+  modelNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  modelItemName: {
+    color: '#ECECF1',
+    fontSize: 16,
+    fontWeight: '600',
+    marginRight: 8,
+  },
+  modelProvider: {
+    color: '#8E8EA0',
+    fontSize: 12,
+    backgroundColor: 'rgba(142, 142, 160, 0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  modelDescription: {
+    color: '#8E8EA0',
+    fontSize: 13,
   },
   attachmentPreview: {
     marginBottom: 12,
@@ -315,11 +518,14 @@ const styles = StyleSheet.create({
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    backgroundColor: '#2D2D3A',
-    borderRadius: 24,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    gap: 6,
+    backgroundColor: GLASS_COLORS.secondary.light,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 163, 127, 0.2)',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 8,
+    marginTop: 8,
   },
   rightButtons: {
     flexDirection: 'row',
@@ -330,6 +536,9 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
+    backgroundColor: GLASS_COLORS.neutral.dark,
+    borderWidth: 1,
+    borderColor: GLASS_COLORS.border.light,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -373,11 +582,12 @@ const styles = StyleSheet.create({
     gap: 32,
     paddingVertical: 20,
     paddingHorizontal: 32,
-    backgroundColor: '#2D2D3A',
+    backgroundColor: GLASS_COLORS.secondary.medium,
     borderRadius: 20,
     marginTop: 12,
     borderWidth: 1,
-    borderColor: 'rgba(142, 142, 160, 0.1)',
+    borderColor: GLASS_COLORS.border.medium,
+    ...GLASS_SHADOWS.strong,
   },
   attachMenuItem: {
     alignItems: 'center',
@@ -391,7 +601,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: 'rgba(142, 142, 160, 0.1)',
+    borderColor: GLASS_COLORS.border.subtle,
   },
   attachMenuText: {
     color: '#ECECF1',
